@@ -1,14 +1,14 @@
 export const GROUPS = {
-  managers: '#a79df0',
-  locations: '#f08556',
-  products: '#dcc3a1',
-  finance: '#ece8e1',
-  alerts: '#ef6461',
-  ai: '#f08556',
+  managers: '#7b61ff',
+  locations: '#ff6a3d',
+  products: '#ffb020',
+  finance: '#e4e4e7',
+  alerts: '#f04438',
+  ai: '#ff6a3d',
 } as const;
 export type Group = keyof typeof GROUPS;
 
-const BASE = ['#f08556', '#a79df0', '#ece8e1', '#dcc3a1', '#8d8a93', '#f8c1a8', '#a4573a', '#cfc8f7', '#55535b'];
+const BASE = ['#ff6a3d', '#7b61ff', '#ffb020', '#e4e4e7', '#8d8a93', '#c2410c', '#b3a5ff', '#55535b'];
 
 export const gColor = (g?: string) => (g && g in GROUPS ? GROUPS[g as Group] : GROUPS.ai);
 

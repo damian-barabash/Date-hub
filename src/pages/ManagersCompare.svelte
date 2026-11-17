@@ -84,14 +84,14 @@
           {#each metrics as k}
             {@const max = Math.max(...sel.map((x) => x[k] ?? 0), 1e-9)}
             <div>
-              <div class="mb-1.5 text-[12px] font-bold faint">{mlabel[k]()}</div>
+              <div class="mb-1.5 text-[13px] font-bold faint">{mlabel[k]()}</div>
               {#each sel as m, i (m.name)}
                 <div class="mb-1.5 flex items-center gap-3">
-                  <div class="w-36 truncate text-[12.5px] font-semibold">{m.name}</div>
+                  <div class="w-36 truncate text-[13.5px] font-semibold">{m.name}</div>
                   <div class="h-2.5 flex-1 overflow-hidden rounded-full bg-white/[0.05]">
                     <div class="bar h-full rounded-full" style="width:{Math.max(0, (m[k] ?? 0) / max) * 100}%; background:{pal[picked.indexOf(m.name) % pal.length]}; animation-delay:{i * 80}ms"></div>
                   </div>
-                  <div class="w-24 text-right text-[12.5px] font-bold num">{fmtM(k, m[k] ?? 0)}</div>
+                  <div class="w-24 text-right text-[13.5px] font-bold num">{fmtM(k, m[k] ?? 0)}</div>
                 </div>
               {/each}
             </div>

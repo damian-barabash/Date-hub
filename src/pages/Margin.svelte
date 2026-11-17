@@ -78,9 +78,9 @@
         <div class="max-h-[420px] space-y-2 overflow-y-auto">
           {#each s.data?.worst ?? [] as p, i}
             <div class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-4 py-2.5 rise" style="--i:{i}">
-              <span class="min-w-0 flex-1 truncate text-[13px] font-semibold">{p[R.r.product!]}</span>
-              <span class="text-[12px] faint num">{int(p.records)} {tr('poz.', 'items')}</span>
-              {#if p.profit !== undefined}<span class="w-24 text-right text-[12.5px] font-bold text-[#ff8f8f] num">{pln(p.profit, true)}</span>{/if}
+              <span class="min-w-0 flex-1 truncate text-[14px] font-semibold">{p[R.r.product!]}</span>
+              <span class="text-[13px] faint num">{int(p.records)} {tr('poz.', 'items')}</span>
+              {#if p.profit !== undefined}<span class="w-24 text-right text-[13.5px] font-bold text-[#ff8f8f] num">{pln(p.profit, true)}</span>{/if}
               <span class="badge num">{pct(p.margin)}</span>
             </div>
           {/each}

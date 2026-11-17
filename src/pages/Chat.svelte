@@ -171,7 +171,7 @@
               ].filter((x) => x.v !== undefined) as k, i}
                 <div class="card rise flex items-center gap-3 p-4 text-left" style="--i:{i + 3}" data-group={k.g}>
                   <span class="faint"><Icon name={k.i} size={20} /></span>
-                  <div><div class="text-[26px] leading-none font-medium tracking-[-0.03em]"><CountUp value={k.v} format="int" compact={k.v > 99999} /></div><div class="mt-1 text-[12px] faint">{k.l}</div></div>
+                  <div><div class="text-[26px] leading-none font-medium tracking-[-0.03em]"><CountUp value={k.v} format="int" compact={k.v > 99999} /></div><div class="mt-1 text-[13px] faint">{k.l}</div></div>
                 </div>
               {/each}
             </div>
@@ -186,7 +186,7 @@
         {#each messages as m, mi (mi)}
           {#if m.role === 'user'}
             <div class="mb-6 flex justify-end" in:fly={{ y: 10, duration: 400 }}>
-              <div class="max-w-[80%] rounded-[22px] rounded-br-md bg-[#232327] px-5 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap">{m.content.text}</div>
+              <div class="max-w-[80%] rounded-[22px] rounded-br-md bg-[#232327] px-5 py-3 text-[15.5px] leading-relaxed whitespace-pre-wrap">{m.content.text}</div>
             </div>
           {:else}
             <div id="msg-{mi}" class="mb-10 flex gap-3 md:gap-4" in:fly={{ y: 10, duration: 400 }}>
@@ -197,8 +197,8 @@
                 {#if m.steps?.length && m.pending}
                   <div class="mb-4 space-y-1.5" transition:slide>
                     {#each m.steps as s (s.key)}
-                      <div class="flex items-center gap-2.5 text-[13px]" in:fly={{ x: -8, duration: 300 }} class:muted={!s.done} class:faint={s.done}>
-                        {#if s.done}<span class={s.error ? 'text-[#ef6461]' : 'faint'}><Icon name={s.error ? 'alert' : 'check'} size={14} /></span>
+                      <div class="flex items-center gap-2.5 text-[14px]" in:fly={{ x: -8, duration: 300 }} class:muted={!s.done} class:faint={s.done}>
+                        {#if s.done}<span class={s.error ? 'text-[#f04438]' : 'faint'}><Icon name={s.error ? 'alert' : 'check'} size={14} /></span>
                         {:else}<span class="spin inline-block h-3.5 w-3.5 rounded-full border-2 border-white/15 border-t-white"></span>{/if}
                         {s.label}
                       </div>
@@ -209,7 +209,7 @@
                   <div class="flex gap-1.5 py-3">{#each [0, 1, 2] as d}<span class="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60" style="animation-delay:{d * 120}ms"></span>{/each}</div>
                 {/if}
                 {#if m.error}
-                  <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-[#ef6461]/30 bg-[#ef6461]/[0.06] px-4 py-3 text-[13.5px] text-[#ffb0b0]" role="alert">
+                  <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-[#f04438]/30 bg-[#f04438]/[0.06] px-4 py-3 text-[14.5px] text-[#ffb0b0]" role="alert">
                     <span class="min-w-0 flex-1">{t('chat.error')}: {m.error}</span>
                     <button class="pill pill-sm" disabled={busy} onclick={() => send(messages[mi - 1]?.content?.text)}><Icon name="refresh" size={13} />{tr('Spróbuj ponownie', 'Try again')}</button>
                   </div>
@@ -224,13 +224,13 @@
                   <div class="mt-5 grid gap-2.5 md:grid-cols-3">
                     {#each m.content.suggestions as s, i}
                       <button class="sugg-card rise" style="--i:{i}; animation-delay:{i * 90}ms" onclick={() => send(s)} disabled={busy}>
-                        <span class="block text-[13.5px] font-medium">{s}</span>
+                        <span class="block text-[14.5px] font-medium">{s}</span>
                       </button>
                     {/each}
                   </div>
                 {/if}
                 {#if !m.pending && m.built !== false && (m.content?.text || m.content?.blocks?.length)}
-                  <div class="mt-4 flex flex-wrap items-center gap-2 text-[12px] faint">
+                  <div class="mt-4 flex flex-wrap items-center gap-2 text-[13px] faint">
                     <button class="pill pill-sm pill-ghost" onclick={() => saveReport(m)}><Icon name="bookmark" size={13} />{t('chat.saveReport')}</button>
                     {#if m.content?.queries?.length}<button class="pill pill-sm pill-ghost" onclick={() => (showSql[mi] = !showSql[mi])}><Icon name="code" size={13} />{t('chat.sql')}</button>{/if}
                     {#if m.content?.cached}<span class="badge">{t('chat.cached')}</span>{/if}
@@ -241,7 +241,7 @@
                   {#if showSql[mi]}
                     <div class="mt-3 space-y-2" transition:slide>
                       {#each m.content.queries as q}
-                        <pre class="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f11] p-3 text-[11.5px] leading-relaxed text-[#a1a1aa]"><span class="text-[#ece8e1]">-- {q.id}: {q.purpose ?? ''} ({q.rows} rows{q.error ? `, ERROR: ${q.error}` : ''})</span>
+                        <pre class="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0f0f11] p-3 text-[12.5px] leading-relaxed text-[#a1a1aa]"><span class="text-[#e4e4e7]">-- {q.id}: {q.purpose ?? ''} ({q.rows} rows{q.error ? `, ERROR: ${q.error}` : ''})</span>
 {q.sql}</pre>
                       {/each}
                     </div>
@@ -259,10 +259,10 @@
   <div class="no-print shrink-0 px-1 pb-5">
     <div class="composer mx-auto max-w-[1060px]">
       <textarea bind:this={ta} bind:value={input} rows="1" placeholder={t('chat.placeholder')} onkeydown={onKey} oninput={autosize}
-        class="block max-h-[200px] w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[15px] outline-none placeholder:text-[#71717a]"></textarea>
+        class="block max-h-[200px] w-full resize-none bg-transparent px-5 pt-4 pb-2 text-[16px] outline-none placeholder:text-[#71717a]"></textarea>
       <div class="flex items-center gap-2 px-3 pb-3">
         <a class="icon-btn !h-9 !w-9" href={href('/sources')} title={t('chat.attach')}><Icon name="clip" size={16} /></a>
-        <span class="text-[12px] faint">{t('chat.model')}</span>
+        <span class="text-[13px] faint">{t('chat.model')}</span>
         {#if busy}
           <button class="ml-auto grid h-10 w-10 place-items-center rounded-full bg-white/10" title="stop" onclick={() => ctrl?.abort()}><span class="h-3 w-3 rounded-sm bg-white"></span></button>
         {:else}
@@ -270,7 +270,7 @@
         {/if}
       </div>
     </div>
-    {#if !ds}<p class="mt-2 text-center text-[12px] faint"><a class="underline" href={href('/sources')}>{t('empty.cta')}</a> — {t('empty.title').toLowerCase()}</p>{/if}
+    {#if !ds}<p class="mt-2 text-center text-[13px] faint"><a class="underline" href={href('/sources')}>{t('empty.cta')}</a> — {t('empty.title').toLowerCase()}</p>{/if}
   </div>
 </div>
 

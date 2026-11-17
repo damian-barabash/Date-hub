@@ -26,7 +26,7 @@
 
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape') menu = false; }} />
 
-<header class="no-print flex h-[68px] shrink-0 items-center gap-3 border-b border-white/[0.06] bg-[#0a0a0b]/80 px-4 backdrop-blur-xl md:px-6">
+<header class="no-print relative z-30 flex h-[68px] shrink-0 items-center gap-3 border-b border-white/[0.06] bg-[#0a0a0b]/80 px-4 backdrop-blur-xl md:px-6">
   <button class="icon-btn" aria-label="menu" onclick={toggleSidebar}><Icon name="sidebar" size={17} /></button>
 
   <div class="relative min-w-0">
@@ -44,18 +44,18 @@
     {#if menu}
       <button class="fixed inset-0 z-40 cursor-default" aria-label="close" onclick={() => (menu = false)}></button>
       <div class="absolute top-12 left-0 z-50 w-[340px] rounded-2xl border border-white/10 bg-[#151517]/98 p-2 shadow-2xl backdrop-blur-xl" transition:fly={{ y: -6, duration: 220 }}>
-        <div class="px-3 pt-2 pb-1 text-[11px] font-bold tracking-widest uppercase faint">{t('src.datasets')}</div>
+        <div class="px-3 pt-2 pb-1 text-[12.5px] font-bold tracking-widest uppercase faint">{t('src.datasets')}</div>
         {#each ready as d (d.id)}
           <button class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-white/5" onclick={() => pick(d.id)}>
             <span class="grid h-8 w-8 place-items-center rounded-lg bg-white/5"><Icon name={d.source === 'file' ? 'layers' : 'link'} size={15} /></span>
             <span class="min-w-0 flex-1">
-              <span class="block truncate text-[13px] font-bold">{d.name}</span>
-              <span class="block text-[11.5px] faint">{d.meta?.period ?? ''} · {int(d.row_count)} {t('common.rows')}</span>
+              <span class="block truncate text-[14px] font-bold">{d.name}</span>
+              <span class="block text-[12.5px] faint">{d.meta?.period ?? ''} · {int(d.row_count)} {t('common.rows')}</span>
             </span>
             {#if d.is_active}<span data-group="finance"><span class="badge">{t('src.active')}</span></span>{/if}
           </button>
         {/each}
-        <a href={href('/sources')} class="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13px] font-semibold muted hover:bg-white/5" onclick={() => (menu = false)}>
+        <a href={href('/sources')} class="mt-1 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[14px] font-semibold muted hover:bg-white/5" onclick={() => (menu = false)}>
           <Icon name="plus" size={15} />{t('empty.cta')}
         </a>
       </div>
@@ -66,7 +66,7 @@
     {#if !route.path.startsWith('/chat')}
       <a class="pill pill-accent hidden sm:inline-flex" data-group="ai" href={href('/chat')}><Icon name="ask" size={15} />{t('ov.ask')}</a>
     {/if}
-    <div class="flex rounded-full border border-white/10 bg-[#151517] p-1 text-[12px] font-bold">
+    <div class="flex rounded-full border border-white/10 bg-[#151517] p-1 text-[13px] font-bold">
       {#each ['pl', 'en'] as l}
         <button class="rounded-full px-3 py-1.5 uppercase transition-colors" class:bg-white={i18n.lang === l} class:text-black={i18n.lang === l}
           class:faint={i18n.lang !== l} onclick={() => setLang(l as 'pl' | 'en')}>{l}</button>

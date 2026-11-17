@@ -8,13 +8,13 @@
 
 <div class="card card-pad kpi rise min-w-0 overflow-hidden" class:hero data-group={group} style="--i:{i}">
   <div class="flex items-center justify-between gap-3">
-    <div class="min-w-0 truncate text-[13.5px] muted">{label}</div>
+    <div class="min-w-0 truncate text-[14.5px] muted">{label}</div>
     {#if icon}<span class="shrink-0 faint"><Icon name={icon} size={17} /></span>{/if}
   </div>
   <div class="val mt-3 truncate leading-none font-semibold tracking-[-0.04em]">
     {#if loading}<div class="skeleton h-8 w-28"></div>{:else if text}{text}{:else}<CountUp {value} {format} {compact} />{/if}
   </div>
-  {#if hint}<div class="mt-2.5 truncate text-[12.5px] faint">{hint}</div>{/if}
+  {#if hint}<div class="mt-2.5 truncate text-[13.5px] faint">{hint}</div>{/if}
 </div>
 
 <style>

@@ -45,8 +45,8 @@
     <div class="space-y-3.5">
       {#each s.data?.dist ?? [] as b, i}
         <div class="rise" style="--i:{i}">
-          <div class="mb-1.5 flex justify-between text-[13px]"><span class="font-bold">{b.range}</span><span class="faint num">{b.n.toLocaleString('pl-PL')} · {pct(b.share)}</span></div>
-          <div class="h-2.5 overflow-hidden rounded-full bg-white/[0.05]"><div class="bar h-full rounded-full bg-[#f08556]" style="width:{Math.max(b.share * 100, 0.6)}%; animation-delay:{i * 90}ms"></div></div>
+          <div class="mb-1.5 flex justify-between text-[14px]"><span class="font-bold">{b.range}</span><span class="faint num">{b.n.toLocaleString('pl-PL')} · {pct(b.share)}</span></div>
+          <div class="h-2.5 overflow-hidden rounded-full bg-white/[0.05]"><div class="bar h-full rounded-full bg-[#ff6a3d]" style="width:{Math.max(b.share * 100, 0.6)}%; animation-delay:{i * 90}ms"></div></div>
         </div>
       {/each}
     </div>
@@ -60,9 +60,9 @@
       <div class="space-y-2">
         {#each s.data?.expensive ?? [] as p, i}
           <div class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-4 py-2.5 rise" style="--i:{i}">
-            <span class="w-5 text-[12px] font-bold faint">{i + 1}</span>
-            <span class="min-w-0 flex-1 truncate text-[13px] font-semibold">{p[s.data?.pcol ?? '']}</span>
-            <span class="text-[13px] font-semibold num">{pln(p.price)}</span>
+            <span class="w-5 text-[13px] font-bold faint">{i + 1}</span>
+            <span class="min-w-0 flex-1 truncate text-[14px] font-semibold">{p[s.data?.pcol ?? '']}</span>
+            <span class="text-[14px] font-semibold num">{pln(p.price)}</span>
           </div>
         {/each}
       </div>

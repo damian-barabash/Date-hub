@@ -48,11 +48,11 @@
       {@const st = (c.stats ?? {}) as any}
       <div class="card card-pad rise" style="--i:{Math.min(i, 16)}" data-group={isNum(c) ? 'finance' : c.type === 'date' ? 'ai' : 'locations'}>
         <div class="flex items-center justify-between gap-2">
-          <div class="truncate text-[13.5px] font-bold">{c.label}</div>
+          <div class="truncate text-[14.5px] font-bold">{c.label}</div>
           <span class="badge shrink-0">{c.type}</span>
         </div>
-        <div class="mt-1 flex gap-2 text-[11.5px] faint"><code>{c.key}</code>{#if c.role}<span>· {c.role}</span>{/if}{#if c.derived}<span>· auto</span>{/if}</div>
-        <div class="mt-3 text-[12.5px] muted">
+        <div class="mt-1 flex gap-2 text-[12.5px] faint"><code>{c.key}</code>{#if c.role}<span>· {c.role}</span>{/if}{#if c.derived}<span>· auto</span>{/if}</div>
+        <div class="mt-3 text-[13.5px] muted">
           {#if isNum(c)}
             min {fmt(st.min, 'num', true)} · max {fmt(st.max, 'num', true)} · Σ {fmt(st.sum, 'num', true)}
           {:else}
@@ -93,7 +93,7 @@
       </table>
     </div>
     <div class="mt-4 flex items-center justify-end gap-2">
-      <span class="mr-2 text-[13px] faint">{page + 1} / {Math.max(1, Math.ceil((preview.data?.total ?? 0) / 25))}</span>
+      <span class="mr-2 text-[14px] faint">{page + 1} / {Math.max(1, Math.ceil((preview.data?.total ?? 0) / 25))}</span>
       <button class="icon-btn" disabled={page === 0} onclick={() => page--} aria-label="prev"><Icon name="left" size={16} /></button>
       <button class="icon-btn" disabled={(page + 1) * 25 >= (preview.data?.total ?? 0)} onclick={() => page++} aria-label="next"><Icon name="right" size={16} /></button>
     </div>

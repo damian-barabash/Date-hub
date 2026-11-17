@@ -90,7 +90,7 @@
         <div><label class="label" for="llat">Lat</label><input id="llat" class="input" bind:value={edit.lat} placeholder="52.23" /></div>
         <div><label class="label" for="llng">Lng</label><input id="llng" class="input" bind:value={edit.lng} placeholder="21.01" /></div>
       </div>
-      <p class="mt-3 text-[12px] faint">{tr('Puste współrzędne → punkt zostanie zgeokodowany ponownie z adresu.', 'Empty coordinates → the point will be re-geocoded from the address.')}</p>
+      <p class="mt-3 text-[13px] faint">{tr('Puste współrzędne → punkt zostanie zgeokodowany ponownie z adresu.', 'Empty coordinates → the point will be re-geocoded from the address.')}</p>
       <div class="mt-5 flex gap-2"><button class="pill pill-accent" onclick={save}>{t('common.save')}</button><button class="pill" onclick={() => (edit = null)}>{t('common.cancel')}</button></div>
     </div>
   </div>

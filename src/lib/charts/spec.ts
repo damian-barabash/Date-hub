@@ -62,7 +62,7 @@ const tooltipBase = {
   borderColor: 'rgba(255,255,255,0.12)',
   borderWidth: 1,
   padding: [10, 14],
-  textStyle: { color: INK[1], fontFamily: 'Manrope', fontSize: 13.5 },
+  textStyle: { color: INK[1], fontFamily: 'Manrope', fontSize: 14.5 },
   extraCssText: 'border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(10px);',
 };
 
@@ -81,18 +81,18 @@ export function baseOption() {
 const axisCommon = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: INK[2], fontSize: 12.5, fontFamily: 'Manrope' },
+  axisLabel: { color: INK[2], fontSize: 13.5, fontFamily: 'Manrope' },
   splitLine: { lineStyle: { color: INK.line, type: 'dashed' as const } },
 };
 
 function legend(show: boolean) {
-  return show ? { bottom: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 16, textStyle: { color: INK[2], fontSize: 13 } } : { show: false };
+  return show ? { bottom: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 16, textStyle: { color: INK[2], fontSize: 14 } } : { show: false };
 }
 
 function barGradient(c: string, horizontal: boolean) {
   return new echarts.graphic.LinearGradient(horizontal ? 1 : 0, 0, 0, horizontal ? 0 : 1, [
     { offset: 0, color: c },
-    { offset: 1, color: mix(c, '#151517', 0.25) },
+    { offset: 1, color: mix(c, '#151517', 0.1) },
   ]);
 }
 
@@ -131,7 +131,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
         color: pal,
         tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: spec.chart === 'bar' ? 'shadow' : 'line', shadowStyle: { color: 'rgba(255,255,255,0.03)' }, lineStyle: { color: alpha(main, 0.5) } }, valueFormatter: vf },
         legend: legend(!single),
-        grid: { left: 6, right: h && single ? 92 : 18, top: 18, bottom: single ? 6 : 38, containLabel: true },
+        grid: { left: 6, right: h && single ? 104 : 18, top: 18, bottom: single ? 6 : 38, containLabel: true },
         xAxis: h ? valAxis : catAxis,
         yAxis: h ? catAxis : valAxis,
         dataZoom: !h && cats.length > 40 ? [{ type: 'inside' }] : undefined,
@@ -143,7 +143,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
               barMaxWidth: 26, barGap: '18%',
               itemStyle: { color: barGradient(c, h), borderRadius: spec.stack ? 2 : h ? [0, 5, 5, 0] : [5, 5, 0, 0] },
               emphasis: { itemStyle: { color: c } },
-              label: single && h ? { show: true, position: 'right', color: INK[1], fontSize: 13, fontWeight: 600, formatter: (p: any) => fmt(p.value, f, true) } : undefined,
+              label: single && h ? { show: true, position: 'right', color: INK[1], fontSize: 14.5, fontWeight: 600, formatter: (p: any) => fmt(p.value, f, true) } : undefined,
               animationDelay: (idx: number) => idx * 45 + i * 120,
             };
           }
@@ -178,8 +178,8 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
         yAxis: { ...axisCommon, type: 'value', axisLabel: { ...axisCommon.axisLabel, formatter: axisFmt(f) } },
         series: [
           { type: 'bar', stack: 'w', data: helper, itemStyle: { color: 'transparent' }, emphasis: { disabled: true }, tooltip: { show: false } },
-          { type: 'bar', stack: 'w', name: '+', data: up, barMaxWidth: 46, itemStyle: { color: barGradient(main, false), borderRadius: 7 }, label: { show: true, position: 'top', color: INK[2], fontSize: 11, formatter: (p: any) => fmt(p.value, f, true) }, animationDelay: (i: number) => i * 160 },
-          { type: 'bar', stack: 'w', name: '−', data: down, barMaxWidth: 46, itemStyle: { color: barGradient('#ef6461', false), borderRadius: 7 }, label: { show: true, position: 'bottom', color: INK[2], fontSize: 11, formatter: (p: any) => '−' + fmt(p.value, f, true) }, animationDelay: (i: number) => i * 160 },
+          { type: 'bar', stack: 'w', name: '+', data: up, barMaxWidth: 46, itemStyle: { color: barGradient(main, false), borderRadius: 7 }, label: { show: true, position: 'top', color: INK[2], fontSize: 12.5, formatter: (p: any) => fmt(p.value, f, true) }, animationDelay: (i: number) => i * 160 },
+          { type: 'bar', stack: 'w', name: '−', data: down, barMaxWidth: 46, itemStyle: { color: barGradient('#f04438', false), borderRadius: 7 }, label: { show: true, position: 'bottom', color: INK[2], fontSize: 12.5, formatter: (p: any) => '−' + fmt(p.value, f, true) }, animationDelay: (i: number) => i * 160 },
         ],
       };
     }
@@ -216,7 +216,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
           roseType: spec.chart === 'rose' ? 'area' : undefined,
           padAngle: donut ? 2.5 : 0,
           itemStyle: { borderRadius: donut ? 8 : 5, borderColor: '#151517', borderWidth: donut ? 0 : 2 },
-          label: { color: INK[2], fontSize: 12.5, formatter: (p: any) => (p.percent < 4 ? '' : `${shortName(p.name, 14)}\n{b|${Math.round(p.percent)}%}`), rich: { b: { color: INK[1], fontWeight: 700, fontSize: 15, padding: [3, 0, 0, 0] } } },
+          label: { color: INK[2], fontSize: 13.5, formatter: (p: any) => (p.percent < 4 ? '' : `${shortName(p.name, 14)}\n{b|${Math.round(p.percent)}%}`), rich: { b: { color: INK[1], fontWeight: 700, fontSize: 16.5, padding: [3, 0, 0, 0] } } },
           labelLine: { lineStyle: { color: 'rgba(255,255,255,0.18)' }, length: 10, length2: 12, smooth: true, showAbove: false },
           labelLayout: { hideOverlap: true },
           emphasis: { scaleSize: 8, itemStyle: { shadowBlur: 24, shadowColor: 'rgba(0,0,0,0.5)' } },
@@ -241,14 +241,14 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
           if (node.children) level = node.children;
         });
       }
-      const colored = root.sort((a, b) => b.value - a.value).map((nd, i) => ({ ...nd, itemStyle: { color: mix(pal[i % pal.length], '#151517', 0.12) } }));
+      const colored = root.sort((a, b) => b.value - a.value).map((nd, i) => ({ ...nd, itemStyle: { color: pal[i % pal.length] } }));
       if (spec.chart === 'sunburst') {
         return {
           ...base,
           tooltip: { ...base.tooltip, trigger: 'item', formatter: (p: any) => `<b>${p.name}</b><br/>${fmt(p.value, f)}` },
           series: [{ type: 'sunburst', data: colored, radius: ['12%', '92%'], sort: 'desc',
             itemStyle: { borderColor: '#151517', borderWidth: 2, borderRadius: 6 },
-            label: { color: '#0a0a0b', fontWeight: 700, fontSize: 11, minAngle: 8 },
+            label: { color: '#0a0a0b', fontWeight: 700, fontSize: 12.5, minAngle: 8 },
             levels: [{}, { r0: '12%', r: '52%' }, { r0: '52%', r: '74%', itemStyle: { opacity: 0.8 } }, { r0: '74%', r: '92%', itemStyle: { opacity: 0.6 } }],
             animationDurationUpdate: 900 }],
         };
@@ -260,8 +260,8 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
           type: 'treemap', data: colored, roam: false, nodeClick: 'zoomToNode', width: '100%', height: '100%', top: 0, left: 0,
           breadcrumb: { show: path.length > 1, bottom: 0, itemStyle: { color: '#1b1b1e', borderColor: 'rgba(255,255,255,0.1)', textStyle: { color: INK[2] } } },
           itemStyle: { borderColor: '#151517', borderWidth: 2, gapWidth: 2, borderRadius: 8 },
-          label: { show: true, color: '#0a0a0b', fontWeight: 800, fontSize: 12, overflow: 'truncate', formatter: (p: any) => `${p.name}\n{v|${fmt(p.value, f, true)}}`, rich: { v: { fontWeight: 600, fontSize: 11, color: 'rgba(10,10,11,0.68)', padding: [4, 0, 0, 0] } } },
-          upperLabel: { show: path.length > 1, height: 26, color: '#f4f4f5', fontWeight: 800, fontSize: 12, formatter: (p: any) => `${p.name}  ·  ${fmt(p.value, f, true)}` },
+          label: { show: true, color: '#0a0a0b', fontWeight: 800, fontSize: 13.5, overflow: 'truncate', formatter: (p: any) => `${p.name}\n{v|${fmt(p.value, f, true)}}`, rich: { v: { fontWeight: 600, fontSize: 12.5, color: 'rgba(10,10,11,0.68)', padding: [4, 0, 0, 0] } } },
+          upperLabel: { show: path.length > 1, height: 30, color: '#f4f4f5', fontWeight: 700, fontSize: 13.5, formatter: (p: any) => `${p.name}  ·  ${fmt(p.value, f, true)}` },
           levels: path.length > 1 ? [
             { itemStyle: { borderColor: '#0f0f11', borderWidth: 0, gapWidth: 5, borderRadius: 12 } },
             { colorAlpha: [0.45, 1], itemStyle: { borderColor: '#151517', borderWidth: 4, gapWidth: 2, borderRadius: 10 }, upperLabel: { show: true } },
@@ -309,12 +309,12 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
             label: { show: labelled.has(i) },
           })),
           itemStyle: { color: alpha(main, many ? 0.6 : 0.85), borderColor: '#151517', borderWidth: 1 },
-          label: { formatter: (p: any) => shortName(p.name, 20), position: 'right', distance: 6, color: INK[1], fontSize: 11.5, fontWeight: 500 },
+          label: { formatter: (p: any) => shortName(p.name, 20), position: 'right', distance: 6, color: INK[1], fontSize: 13, fontWeight: 500 },
           labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
           emphasis: { scale: 1.6, itemStyle: { color: main, borderColor: '#fff' }, label: { show: true, fontWeight: 700 } },
           markLine: {
             silent: true, symbol: 'none', animation: true,
-            label: { color: INK[2], fontSize: 11, formatter: (p: any) => `śr. ${fmt(p.value, p.data.xAxis !== undefined ? fx : fy, true)}` },
+            label: { color: INK[2], fontSize: 12.5, formatter: (p: any) => `śr. ${fmt(p.value, p.data.xAxis !== undefined ? fx : fy, true)}` },
             data: [{ xAxis: mx, lineStyle: avgLine, label: { show: false } }, { yAxis: my, lineStyle: avgLine, label: { position: 'insideEndTop' } }],
           },
           animationDelay: (i: number) => Math.min(i * 8, 900),
@@ -389,7 +389,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
             type: 'sankey', left: 8, right: 120, top: 10, bottom: 10, nodeWidth: 12, nodeGap: 8, draggable: true, emphasis: { focus: 'adjacency' },
             data: names.map((nm, i) => ({ name: nm, itemStyle: { color: sources.has(nm) ? pal[i % pal.length] : mix(main, '#151517', 0.2), borderRadius: 4 } })),
             links, lineStyle: { color: 'gradient', curveness: 0.5, opacity: 0.32 },
-            label: { color: INK[2], fontSize: 11, formatter: (p: any) => shortName(p.name, 22) },
+            label: { color: INK[2], fontSize: 12.5, formatter: (p: any) => shortName(p.name, 22) },
             animationDuration: 1500,
           }],
         };
@@ -406,7 +406,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
           force: { repulsion: 220, edgeLength: [50, 140], gravity: 0.08, friction: 0.12 },
           categories: [{ name: label(spec, src), itemStyle: { color: pal[0] } }, { name: label(spec, tgt), itemStyle: { color: pal[1] } }],
           data: names.map((nm) => ({ name: nm, category: sources.has(nm) ? 0 : 1, symbolSize: 8 + Math.sqrt((weight.get(nm) ?? 0) / wmax) * (sources.has(nm) ? 46 : 26),
-            label: { show: sources.has(nm), color: INK[1], fontWeight: 700, fontSize: 11 } })),
+            label: { show: sources.has(nm), color: INK[1], fontWeight: 700, fontSize: 12.5 } })),
           links: links.map((l) => ({ ...l, lineStyle: { width: 0.6 + Math.sqrt(l.value / wmax) * 4 } })),
           lineStyle: { color: 'source', opacity: 0.35, curveness: 0.12 },
           itemStyle: { borderColor: '#0a0a0b', borderWidth: 1.5, shadowBlur: 12, shadowColor: 'rgba(0,0,0,0.4)' },
@@ -426,8 +426,8 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
       const zs = rows.map((r) => n(r[zk]) ?? 0);
       const data = rows.map((r) => [xCat ? xs.indexOf(String(r[spec.x!])) : n(r[spec.x!]), yCat ? yv.indexOf(String(r[yk])) : n(r[yk]), n(r[zk]) ?? 0]);
       const ax = (cat: boolean, names: string[], nm: string, fm?: Fmt) => ({
-        type: cat ? 'category' : 'value', data: cat ? names : undefined, name: nm, nameTextStyle: { color: INK[2], fontSize: 11 },
-        axisLabel: { color: INK[3], fontSize: 10, interval: 0, formatter: cat ? (v: string) => shortName(v, 12) : axisFmt(fm) },
+        type: cat ? 'category' : 'value', data: cat ? names : undefined, name: nm, nameTextStyle: { color: INK[2], fontSize: 12.5 },
+        axisLabel: { color: INK[3], fontSize: 11.5, interval: 0, formatter: cat ? (v: string) => shortName(v, 12) : axisFmt(fm) },
         axisLine: { lineStyle: { color: 'rgba(255,255,255,0.2)' } }, splitLine: { lineStyle: { color: 'rgba(255,255,255,0.06)' } }, axisPointer: { lineStyle: { color: main } },
       });
       const kind = spec.chart === 'bar3d' ? 'bar3D' : spec.chart === 'scatter3d' ? 'scatter3D' : 'surface';

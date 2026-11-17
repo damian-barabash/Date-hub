@@ -163,20 +163,20 @@
         {#if parsing}<span class="spin inline-block h-6 w-6 rounded-full border-2 border-white/20 border-t-[var(--g)]"></span>{:else}<Icon name="upload" size={28} />{/if}
       </div>
       <div class="mt-5 text-[22px] font-medium tracking-[-0.02em]">{parsing ? t('src.parsing') : t('src.drop')}</div>
-      <div class="mt-1 text-[13px] faint">{t('src.drop.sub')}</div>
+      <div class="mt-1 text-[14px] faint">{t('src.drop.sub')}</div>
     </button>
     <input bind:this={input} type="file" accept=".xlsx,.xls,.xlsm,.csv,.json,.ods" class="hidden" onchange={(e) => { const f = (e.target as HTMLInputElement).files?.[0]; if (f) void pick(f); (e.target as HTMLInputElement).value = ''; }} />
   {/if}
 
-  {#if err}<div class="mt-4 rounded-2xl border border-[#ef6461]/30 bg-[#ef6461]/[0.06] px-4 py-3 text-[13px] text-[#ffb0b0]">{err}</div>{/if}
-  {#if geo}<div class="mt-4 flex items-center gap-2 text-[13px] muted"><span class="spin inline-block h-3.5 w-3.5 rounded-full border-2 border-white/20 border-t-[var(--g)]"></span>{geo}</div>{/if}
+  {#if err}<div class="mt-4 rounded-2xl border border-[#f04438]/30 bg-[#f04438]/[0.06] px-4 py-3 text-[14px] text-[#ffb0b0]">{err}</div>{/if}
+  {#if geo}<div class="mt-4 flex items-center gap-2 text-[14px] muted"><span class="spin inline-block h-3.5 w-3.5 rounded-full border-2 border-white/20 border-t-[var(--g)]"></span>{geo}</div>{/if}
 
   {#if doneInfo}
     <div class="card mt-4 flex flex-wrap items-center gap-4 p-5 rise" data-group="finance">
       <span class="grid h-12 w-12 place-items-center rounded-2xl bg-[var(--g)] text-black"><Icon name="check" size={22} stroke={2.6} /></span>
       <div class="flex-1">
         <div class="text-[16px] font-semibold">{t('src.done')}</div>
-        <div class="text-[13px] muted">{int(doneInfo.rows)} {doneInfo.directory ? tr('punktów w słowniku', 'points in directory') : t('common.rows')}</div>
+        <div class="text-[14px] muted">{int(doneInfo.rows)} {doneInfo.directory ? tr('punktów w słowniku', 'points in directory') : t('common.rows')}</div>
       </div>
       {#if !doneInfo.directory}
         <button class="pill" onclick={() => go('/explore')}><Icon name="compass" size={15} />{t('nav.explore')}</button>
@@ -189,9 +189,9 @@
 
   {#if progress}
     <div class="card mt-2 p-6 rise">
-      <div class="mb-3 flex justify-between text-[14px] font-bold"><span>{progress.phase}</span><span class="num">{int(progress.done)} / {int(progress.total)}</span></div>
+      <div class="mb-3 flex justify-between text-[15px] font-bold"><span>{progress.phase}</span><span class="num">{int(progress.done)} / {int(progress.total)}</span></div>
       <div class="h-3 overflow-hidden rounded-full bg-white/[0.06]">
-        <div class="h-full rounded-full bg-[#f08556] transition-all duration-500" style="width:{pct}%"></div>
+        <div class="h-full rounded-full bg-[#ff6a3d] transition-all duration-500" style="width:{pct}%"></div>
       </div>
     </div>
   {/if}
@@ -200,7 +200,7 @@
     <div class="mt-2 space-y-4" in:fly={{ y: 10, duration: 400 }}>
       <div class="flex flex-wrap items-center gap-3">
         <span class="pill"><Icon name="layers" size={15} />{file?.name}</span>
-        <span class="text-[13px] muted">{int(inf.rows.length)} {t('common.rows')} · {inf.columns.length} {tr('kolumn', 'columns')}{inf.meta.skipped ? ` · ${inf.meta.skipped} ${tr('pominięto (notatki/puste)', 'skipped (notes/empty)')}` : ''}</span>
+        <span class="text-[14px] muted">{int(inf.rows.length)} {t('common.rows')} · {inf.columns.length} {tr('kolumn', 'columns')}{inf.meta.skipped ? ` · ${inf.meta.skipped} ${tr('pominięto (notatki/puste)', 'skipped (notes/empty)')}` : ''}</span>
         {#if sheets.length > 1}
           <select class="input !h-9 !w-auto" value={sheet} onchange={(e) => changeSheet((e.target as HTMLSelectElement).value)}>
             {#each sheets as s}<option>{s}</option>{/each}
@@ -209,13 +209,13 @@
         <button class="pill pill-sm ml-auto" onclick={() => { inf = null; file = null; }}><Icon name="x" size={13} />{t('common.cancel')}</button>
       </div>
 
-      <div class="flex rounded-full border border-white/10 bg-[#151517] p-1 text-[12.5px] font-bold w-fit">
+      <div class="flex rounded-full border border-white/10 bg-[#151517] p-1 text-[13.5px] font-bold w-fit">
         <button class="rounded-full px-4 py-2" class:bg-[var(--g)]={mode === 'dataset'} class:text-black={mode === 'dataset'} onclick={() => (mode = 'dataset')}>{tr('Zbiór danych do analizy', 'Dataset for analysis')}</button>
         <button class="rounded-full px-4 py-2" class:bg-[var(--g)]={mode === 'directory'} class:text-black={mode === 'directory'} onclick={() => (mode = 'directory')}>{tr('Słownik punktów (adresy)', 'Point directory (addresses)')}</button>
       </div>
 
       {#if inf.meta.notes.length}
-        <div class="rounded-2xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-[12.5px] muted" transition:slide>
+        <div class="rounded-2xl border border-white/[0.07] bg-white/[0.02] px-4 py-3 text-[13.5px] muted" transition:slide>
           <b class="text-white">{tr('Notatki z eksportu', 'Export notes')}:</b> {inf.meta.notes.join(' · ').replace(/\n/g, ' · ')}
         </div>
       {/if}
@@ -226,37 +226,37 @@
           <div><label class="label" for="dsp">{t('src.period')}</label><input id="dsp" class="input" bind:value={period} placeholder="2025-11" /></div>
         </div>
         <div class="card overflow-x-auto p-4">
-          <div class="mb-3 text-[13px] font-bold">{t('src.detected')}</div>
+          <div class="mb-3 text-[14px] font-bold">{t('src.detected')}</div>
           <table class="table">
             <thead><tr><th>{t('src.column')}</th><th>{t('src.type')}</th><th>{t('src.role')}</th><th>{tr('Przykład', 'Example')}</th></tr></thead>
             <tbody>
               {#each inf.columns as c (c.key)}
                 <tr>
-                  <td><div class="font-bold">{c.label}</div><div class="text-[11px] faint"><code>{c.key}</code>{c.derived ? ` · auto: ${c.derived.op}` : ''}</div></td>
+                  <td><div class="font-bold">{c.label}</div><div class="text-[12.5px] faint"><code>{c.key}</code>{c.derived ? ` · auto: ${c.derived.op}` : ''}</div></td>
                   <td>
                     {#if c.derived}<span class="badge">{c.type}</span>{:else}
-                      <select class="input !h-8 !w-auto !text-[12px]" bind:value={c.type}>
+                      <select class="input !h-8 !w-auto !text-[13px]" bind:value={c.type}>
                         {#each ['text', 'number', 'integer', 'date', 'datetime', 'boolean'] as ty}<option>{ty}</option>{/each}
                       </select>
                     {/if}
                   </td>
                   <td>
-                    <select class="input !h-8 !w-auto !text-[12px]" value={c.role ?? ''} onchange={(e) => setRole(c, (e.target as HTMLSelectElement).value)}>
+                    <select class="input !h-8 !w-auto !text-[13px]" value={c.role ?? ''} onchange={(e) => setRole(c, (e.target as HTMLSelectElement).value)}>
                       <option value="">—</option>
                       {#each ROLES as r}<option value={r}>{i18nRole(r)}</option>{/each}
                     </select>
                   </td>
-                  <td class="max-w-[240px] truncate text-[12.5px] muted">{String(inf.rows.find((r) => r[c.key] !== null && r[c.key] !== undefined)?.[c.key] ?? '—')}</td>
+                  <td class="max-w-[240px] truncate text-[13.5px] muted">{String(inf.rows.find((r) => r[c.key] !== null && r[c.key] !== undefined)?.[c.key] ?? '—')}</td>
                 </tr>
               {/each}
             </tbody>
           </table>
         </div>
-        <button class="pill pill-accent !h-12 !px-6 !text-[14px]" onclick={importDataset}><Icon name="upload" size={16} />{t('src.import')} · {int(inf.rows.length)} {t('common.rows')}</button>
+        <button class="pill pill-accent !h-12 !px-6 !text-[15px]" onclick={importDataset}><Icon name="upload" size={16} />{t('src.import')} · {int(inf.rows.length)} {t('common.rows')}</button>
       {:else}
         <div class="card p-5">
-          <div class="mb-1 text-[13px] font-bold">{tr('Mapowanie pól słownika', 'Directory field mapping')}</div>
-          <p class="mb-4 text-[12.5px] faint">{tr('Kod punktu musi odpowiadać kolumnie punktu/magazynu w danych sprzedaży. Adresy zostaną zgeokodowane na mapie.', 'The point code must match the point/warehouse column in sales data. Addresses will be geocoded on the map.')}</p>
+          <div class="mb-1 text-[14px] font-bold">{tr('Mapowanie pól słownika', 'Directory field mapping')}</div>
+          <p class="mb-4 text-[13.5px] faint">{tr('Kod punktu musi odpowiadać kolumnie punktu/magazynu w danych sprzedaży. Adresy zostaną zgeokodowane na mapie.', 'The point code must match the point/warehouse column in sales data. Addresses will be geocoded on the map.')}</p>
           <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {#each DIR_FIELDS as f}
               <div>
@@ -269,13 +269,13 @@
             {/each}
           </div>
           {#if dirMap.code}
-            <div class="mt-4 text-[12.5px] muted">
+            <div class="mt-4 text-[13.5px] muted">
               {tr('Zgodność z punktami w danych', 'Match with points in data')}:
               <b class="text-white">{int(inf.rows.filter((r) => app.locations.some((l) => l.code === String(r[dirMap.code]))).length)}</b> / {int(inf.rows.length)}
             </div>
           {/if}
         </div>
-        <button class="pill pill-accent !h-12 !px-6 !text-[14px]" disabled={!dirMap.code} onclick={importDirectory}><Icon name="pin" size={16} />{tr('Zapisz słownik punktów', 'Save point directory')}</button>
+        <button class="pill pill-accent !h-12 !px-6 !text-[15px]" disabled={!dirMap.code} onclick={importDirectory}><Icon name="pin" size={16} />{tr('Zapisz słownik punktów', 'Save point directory')}</button>
       {/if}
     </div>
   {/if}

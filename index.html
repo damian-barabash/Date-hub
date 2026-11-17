@@ -13,7 +13,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Michroma&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app"><div style="height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#0a0a0b;color:#f4f4f5">
+      <div style="display:flex;align-items:center;gap:12px">
+        <svg width="49" height="38" viewBox="0 0 460 360" aria-hidden="true"><defs><mask id="bm" maskUnits="userSpaceOnUse" x="0" y="0" width="460" height="360"><rect width="460" height="360" fill="#000"/><path d="M13 15H287A163.5 163.5 0 0 1 287 342H13Z" fill="#fff"/><path d="M100 85h65v63h103V85h66v190h-66v-69H165v69h-65z M189.1 17L174.9 3L0.9 179L15.1 193Z M399.4 194.7L384.6 181.3L242.6 338.3L257.4 351.7Z" fill="#000"/></mask></defs><rect width="460" height="360" fill="#f4f4f5" mask="url(#bm)"/></svg>
+        <div style="line-height:1"><div style="font:400 15px Michroma,sans-serif;letter-spacing:.06em">AI DATA HUB</div><div style="font:400 8.5px Michroma,sans-serif;letter-spacing:.55em;opacity:.55;margin-top:6px">CK COMPLEX</div></div>
+      </div>
+      <div style="width:132px;height:2px;border-radius:2px;background:rgba(255,255,255,.1);overflow:hidden"><i style="display:block;width:40%;height:100%;background:#ff6a3d;animation:boot 1.1s cubic-bezier(.65,0,.35,1) infinite"></i></div>
+    </div></div>
+    <style>html,body{margin:0;background:#0a0a0b}@keyframes boot{from{transform:translateX(-110%)}to{transform:translateX(260%)}}</style>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

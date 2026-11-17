@@ -94,8 +94,8 @@
         <tbody>
           {#each filtered.slice(page * PER, page * PER + PER) as x, i (x.loc)}
             <tr class="clickable rise" style="--i:{i}" onclick={() => go(`/locations/${encodeURIComponent(x.loc)}`)}>
-              <td><div class="font-bold">{x.loc}</div>{#if x.name}<div class="text-[11.5px] faint">{x.name}</div>{/if}</td>
-              <td><div>{x.city}</div>{#if x.kind !== '—'}<div class="text-[11.5px] faint">{x.kind}</div>{/if}</td>
+              <td><div class="font-bold">{x.loc}</div>{#if x.name}<div class="text-[12.5px] faint">{x.name}</div>{/if}</td>
+              <td><div>{x.city}</div>{#if x.kind !== '—'}<div class="text-[12.5px] faint">{x.kind}</div>{/if}</td>
               <td class="muted">{x.manager ?? '—'}</td>
               <td class="r num font-semibold">{pln(x.revenue)}</td>
               {#if R.has('profit')}<td class="r"><span data-group={x.margin < 0.3 ? 'alerts' : x.margin > 0.45 ? 'finance' : 'products'}><span class="badge num">{pct(x.margin)}</span></span></td>{/if}
@@ -113,7 +113,7 @@
         </div>
       {/if}
     </div>
-    <div class="mt-4 flex items-center justify-between text-[13px]">
+    <div class="mt-4 flex items-center justify-between text-[14px]">
       <span class="faint">{tr('Strona', 'Page')} {page + 1} / {pages}</span>
       <div class="flex gap-2">
         <button class="icon-btn" disabled={page === 0} onclick={() => page--} aria-label="prev"><Icon name="left" size={16} /></button>

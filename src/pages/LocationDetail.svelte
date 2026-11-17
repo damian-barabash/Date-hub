@@ -82,8 +82,8 @@
         <div class="space-y-2">
           {#each s.data?.worst ?? [] as p, i}
             <div class="flex items-center justify-between gap-3 rounded-xl bg-white/[0.025] px-4 py-3 rise" style="--i:{i}">
-              <span class="truncate text-[13px] font-semibold">{p[R?.r.product ?? '']}</span>
-              <span class="flex shrink-0 items-center gap-3 text-[12.5px]"><span class="faint num">{pln(p.revenue, true)}</span><span class="badge num">{pct(p.margin)}</span></span>
+              <span class="truncate text-[14px] font-semibold">{p[R?.r.product ?? '']}</span>
+              <span class="flex shrink-0 items-center gap-3 text-[13.5px]"><span class="faint num">{pln(p.revenue, true)}</span><span class="badge num">{pct(p.margin)}</span></span>
             </div>
           {/each}
         </div>

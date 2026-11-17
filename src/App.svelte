@@ -11,8 +11,9 @@
 </script>
 
 {#if !app.ready}
-  <div class="grid h-full place-items-center" out:fade={{ duration: 300 }}>
-    <div class="text-white/90"><Logo size={40} animate /></div>
+  <div class="boot" out:fade={{ duration: 250 }}>
+    <div class="text-white"><Logo size={38} /></div>
+    <div class="boot-bar"><i></i></div>
   </div>
 {:else if !app.session}
   <Login />

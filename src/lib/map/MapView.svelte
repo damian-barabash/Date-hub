@@ -96,7 +96,7 @@
     if (colorScale === 'group') return main;
     if (colorScale === 'value') return ['interpolate', ['linear'], ['get', 's'], 0, mix(main, '#0a0a0b', 0.45), 1, mix(main, '#ffffff', 0.3)];
     // маржа: красный → янтарный → лайм
-    return ['interpolate', ['linear'], ['get', 'c'], 0, '#ef6461', 0.25, '#f08556', 0.6, '#ece8e1', 1, '#7fd1a3'];
+    return ['interpolate', ['linear'], ['get', 'c'], 0, '#f04438', 0.25, '#ff6a3d', 0.6, '#e4e4e7', 1, '#34d399'];
   }
 
   function fit() {
@@ -197,15 +197,15 @@
         <div class="flex items-start gap-3 p-4 pb-3">
           <div class="min-w-0 flex-1">
             <div class="text-[16px] leading-snug font-semibold break-words">{sel.title}</div>
-            {#if sel.subtitle}<div class="mt-1 text-[12.5px] leading-snug break-words faint">{sel.subtitle}</div>{/if}
+            {#if sel.subtitle}<div class="mt-1 text-[13.5px] leading-snug break-words faint">{sel.subtitle}</div>{/if}
           </div>
           <button class="icon-btn !h-8 !w-8 shrink-0" aria-label="close" onclick={() => (sel = null)}><Icon name="x" size={15} /></button>
         </div>
         <div class="min-h-0 flex-1 overflow-y-auto px-4">
           {#each sel.rows ?? [] as [k, v]}
-            <div class="flex items-baseline justify-between gap-4 border-t border-white/[0.06] py-2 text-[13px]"><span class="faint">{k}</span><span class="text-right font-semibold break-words">{v}</span></div>
+            <div class="flex items-baseline justify-between gap-4 border-t border-white/[0.06] py-2 text-[14px]"><span class="faint">{k}</span><span class="text-right font-semibold break-words">{v}</span></div>
           {/each}
-          {#if sel.approx}<div class="border-t border-white/[0.06] py-2 text-[12px] text-[#dcc3a1]">≈ lokalizacja przybliżona</div>{/if}
+          {#if sel.approx}<div class="border-t border-white/[0.06] py-2 text-[13px] text-[#ffb020]">≈ lokalizacja przybliżona</div>{/if}
         </div>
         {#if detailHref}
           <div class="p-4 pt-3"><a class="pill pill-accent w-full justify-center" href={detailHref(sel.code)}>Szczegóły<Icon name="right" size={14} /></a></div>

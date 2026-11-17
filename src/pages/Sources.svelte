@@ -22,7 +22,7 @@
 
 <div class="mb-5 flex flex-wrap gap-2 rise" style="--i:1" data-group="locations">
   {#each tabs as x}
-    <button class="pill" class:pill-accent={tab === x.k} onclick={() => (tab = x.k)}>{x.l}{#if x.n}<span class="rounded-full bg-black/20 px-1.5 text-[11px]">{int(x.n)}</span>{/if}</button>
+    <button class="pill" class:pill-accent={tab === x.k} onclick={() => (tab = x.k)}>{x.l}{#if x.n}<span class="rounded-full bg-black/20 px-1.5 text-[12.5px]">{int(x.n)}</span>{/if}</button>
   {/each}
 </div>
 

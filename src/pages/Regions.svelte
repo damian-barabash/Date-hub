@@ -38,7 +38,7 @@
   <PageHeader title={t('loc.byRegion')} sub={tr('Województwa, oddziały i rodzaje punktów (ze słownika lokalizacji)', 'Regions, branches and point types (from the location directory)')}>
     <div class="flex max-w-full overflow-x-auto rounded-full border border-white/10 bg-[#151517] p-1" data-group="locations">
       {#each dims as d}
-        <button class="shrink-0 rounded-full px-3.5 py-2 text-[13px] font-semibold whitespace-nowrap transition-colors" class:bg-[var(--g)]={dim === d.k} class:text-black={dim === d.k} class:faint={dim !== d.k} onclick={() => (dim = d.k)}>{d.l()}</button>
+        <button class="shrink-0 rounded-full px-3.5 py-2 text-[14px] font-semibold whitespace-nowrap transition-colors" class:bg-[var(--g)]={dim === d.k} class:text-black={dim === d.k} class:faint={dim !== d.k} onclick={() => (dim = d.k)}>{d.l()}</button>
       {/each}
     </div>
   </PageHeader>

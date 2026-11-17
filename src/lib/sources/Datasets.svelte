@@ -51,11 +51,11 @@
           <span class="grid h-11 w-11 place-items-center rounded-2xl border border-white/10 muted"><Icon name={d.source === 'file' ? 'layers' : 'link'} size={19} /></span>
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">
-              <span class="truncate text-[15px] font-semibold">{d.name}</span>
+              <span class="truncate text-[16px] font-semibold">{d.name}</span>
               {#if d.is_active}<span class="badge">{t('src.active')}</span>{/if}
               {#if d.status !== 'ready'}<span data-group="alerts"><span class="badge">{d.status}</span></span>{/if}
             </div>
-            <div class="mt-0.5 text-[12.5px] faint">{d.source} · {int(d.row_count)} {t('common.rows')} · {d.columns.length} {tr('kolumn', 'columns')}{d.meta?.period ? ` · ${d.meta.period}` : ''} · {dateTime(d.created_at)}</div>
+            <div class="mt-0.5 text-[13.5px] faint">{d.source} · {int(d.row_count)} {t('common.rows')} · {d.columns.length} {tr('kolumn', 'columns')}{d.meta?.period ? ` · ${d.meta.period}` : ''} · {dateTime(d.created_at)}</div>
           </div>
           <div class="flex flex-wrap gap-2">
             {#if !d.is_active && d.status === 'ready'}<button class="pill pill-sm" onclick={() => activate(d)}><Icon name="check" size={13} />{t('src.activate')}</button>{/if}
@@ -65,12 +65,12 @@
         </div>
         {#if editing === d.id}
           <div class="border-t border-white/[0.06] p-5" transition:slide>
-            <p class="mb-4 text-[12.5px] faint">{tr('Role mówią systemowi, co oznacza kolumna — od nich zależą dashboardy i podpowiedzi dla AI.', 'Roles tell the system what a column means — dashboards and AI hints depend on them.')}</p>
+            <p class="mb-4 text-[13.5px] faint">{tr('Role mówią systemowi, co oznacza kolumna — od nich zależą dashboardy i podpowiedzi dla AI.', 'Roles tell the system what a column means — dashboards and AI hints depend on them.')}</p>
             <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {#each d.columns as c (c.key)}
                 <div class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-3 py-2">
-                  <div class="min-w-0 flex-1"><div class="truncate text-[13px] font-bold">{c.label}</div><div class="text-[11px] faint">{c.type}{c.derived ? ' · auto' : ''}</div></div>
-                  <select class="input !h-8 !w-[150px] !text-[12px]" bind:value={draft[c.key]}>
+                  <div class="min-w-0 flex-1"><div class="truncate text-[14px] font-bold">{c.label}</div><div class="text-[12.5px] faint">{c.type}{c.derived ? ' · auto' : ''}</div></div>
+                  <select class="input !h-8 !w-[150px] !text-[13px]" bind:value={draft[c.key]}>
                     <option value="">—</option>
                     {#each ROLES as r}<option value={r}>{i18nRole(r)}</option>{/each}
                   </select>

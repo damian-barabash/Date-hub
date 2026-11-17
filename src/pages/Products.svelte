@@ -85,9 +85,9 @@
           <div class="space-y-2">
             {#each (box.k === 'best' ? d?.best : d?.worst) ?? [] as p, i}
               <div class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-4 py-3 rise" style="--i:{i}">
-                <span class="w-5 text-[12px] font-bold faint">{i + 1}</span>
-                <span class="min-w-0 flex-1 truncate text-[13px] font-semibold">{p[d!.pcol]}</span>
-                <span class="text-[12px] faint num">{pln(p.revenue, true)}</span>
+                <span class="w-5 text-[13px] font-bold faint">{i + 1}</span>
+                <span class="min-w-0 flex-1 truncate text-[14px] font-semibold">{p[d!.pcol]}</span>
+                <span class="text-[13px] faint num">{pln(p.revenue, true)}</span>
                 <span class="badge num">{pct(p.margin)}</span>
               </div>
             {/each}

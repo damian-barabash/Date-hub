@@ -80,14 +80,14 @@
           { k: t('ov.lowMargin'), v: tot.low, show: R?.has('margin'), q: tr('Które produkty mają marżę poniżej 10%?', 'Which products have margin below 10%?') },
           { k: t('ov.returns'), v: tot.returns, show: !!R?.revenue, q: tr('Przeanalizuj zwroty i korekty (ujemne przychody)', 'Analyse returns and corrections (negative revenue)') },
         ].filter((x) => x.show) as a, i}
-          <button class="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5 text-left text-[13.5px] font-semibold transition hover:border-[#ef6461]/40 hover:bg-[#ef6461]/[0.05] rise" style="--i:{i + 4}" onclick={() => go(`/chat?q=${encodeURIComponent(a.q)}`)}>
+          <button class="flex w-full items-center justify-between rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3.5 text-left text-[14.5px] font-semibold transition hover:border-[#f04438]/40 hover:bg-[#f04438]/[0.05] rise" style="--i:{i + 4}" onclick={() => go(`/chat?q=${encodeURIComponent(a.q)}`)}>
             {a.k}
             <span class="flex items-center gap-2"><span class="badge num">{int(a.v)}</span><Icon name="ask" size={14} class="faint" /></span>
           </button>
         {/each}
       </div>
       {#if mdistRows.length}
-        <div class="mt-5 text-[13px] font-bold">{t('ov.marginDist')}</div>
+        <div class="mt-5 text-[14px] font-bold">{t('ov.marginDist')}</div>
         <div class="card-sub">{tr('liczba pozycji wg przedziału marży', 'line items by margin bucket')}</div>
         <Chart height={190} rows={mdistRows} spec={{ chart: 'bar', x: 'bucket', y: ['n'], format: 'int', group: 'products' }} />
       {/if}

@@ -31,7 +31,7 @@
     return { ...b, type, chart };
   }
   const list = $derived(blocks.map(norm));
-  const tall = (k: Kind) => (['bar3d', 'scatter3d', 'surface3d', 'network3d', 'map', 'treemap', 'sankey', 'graph', 'sunburst'].includes(k) ? 440 : ['gauge'].includes(k) ? 260 : 340);
+  const tall = (k: Kind) => (k === 'network3d' ? 580 : ['bar3d', 'scatter3d', 'surface3d', 'map', 'treemap', 'sankey', 'graph', 'sunburst'].includes(k) ? 460 : k === 'gauge' ? 260 : 360);
 
   function mapPoints(b: any, rows: Record<string, any>[]) {
     const nameCol = b.name ?? b.x ?? Object.keys(rows[0] ?? {})[0];
@@ -64,7 +64,7 @@
       {:else if b.type === 'callout'}
         <div class="flex gap-3 rounded-2xl border p-4" data-group={b.tone === 'warn' ? 'alerts' : b.tone === 'good' ? 'finance' : 'ai'}
           style="border-color:var(--color-line-2); background:rgb(255 255 255 / 0.02)">
-          <span class={b.tone === 'warn' ? 'text-[#ef6461]' : 'faint'}><Icon name={b.tone === 'warn' ? 'alert' : b.tone === 'good' ? 'check' : 'bolt'} size={18} /></span>
+          <span class={b.tone === 'warn' ? 'text-[#f04438]' : 'faint'}><Icon name={b.tone === 'warn' ? 'alert' : b.tone === 'good' ? 'check' : 'bolt'} size={18} /></span>
           <Markdown text={b.md ?? ''} />
         </div>
       {:else if b.type === 'text'}
