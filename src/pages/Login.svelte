@@ -20,6 +20,15 @@
   }
 
   // спокойный фон: столбцы и одна линия тренда
+  // шесть линий по очереди «строят» графики, цикл бесконечный
+  const lines = [
+    { d: 'M0 330 C 140 310, 240 340, 380 270 S 600 210, 740 190 S 900 120, 1000 80', c: '#f08556', w: 1.8, o: 1 },
+    { d: 'M0 370 C 120 360, 260 300, 400 320 S 620 250, 760 260 S 920 180, 1000 170', c: '#f4f4f5', w: 1.2, o: 0.5 },
+    { d: 'M0 290 C 160 300, 250 240, 390 230 S 610 260, 730 150 S 910 130, 1000 40', c: '#f4f4f5', w: 1.2, o: 0.28 },
+    { d: 'M0 400 C 150 380, 280 390, 420 350 S 640 340, 780 300 S 930 270, 1000 240', c: '#a79df0', w: 1.4, o: 0.75 },
+    { d: 'M0 350 C 130 330, 230 370, 370 310 S 590 290, 720 230 S 900 210, 1000 120', c: '#f4f4f5', w: 1.2, o: 0.38 },
+    { d: 'M0 410 C 170 400, 300 360, 440 380 S 660 310, 790 330 S 940 290, 1000 300', c: '#f08556', w: 1.2, o: 0.45 },
+  ];
   const bars = Array.from({ length: 28 }, (_, i) => 40 + Math.abs(Math.sin(i * 1.3) * 110) + i * 5);
 </script>
 
@@ -43,7 +52,9 @@
             <rect x={i * 36 + 4} y={420 - h} width="22" height={h} rx="4" fill="rgba(255,255,255,0.03)" style="animation-delay:{i * 30}ms" />
           {/each}
         </g>
-        <path d="M0 330 C 140 310, 240 340, 380 270 S 600 210, 740 190 S 900 120, 1000 80" fill="none" stroke="#f08556" stroke-width="1.6" stroke-linecap="round" pathLength="1" class="ln" vector-effect="non-scaling-stroke" />
+        {#each lines as l, i}
+          <path d={l.d} fill="none" stroke={l.c} stroke-width={l.w} stroke-linecap="round" pathLength="1" class="ln" vector-effect="non-scaling-stroke" style="animation-delay:{i * 1.1}s; --o:{l.o}" />
+        {/each}
       </svg>
     </section>
 
@@ -83,7 +94,14 @@
 </div>
 
 <style>
-  .ln { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2.6s cubic-bezier(.65,0,.35,1) .3s forwards; }
+  .ln { stroke-dasharray: 1; stroke-dashoffset: 1; opacity: 0; animation: build 6.6s cubic-bezier(.65,0,.35,1) infinite both; }
+  @keyframes build {
+    0% { stroke-dashoffset: 1; opacity: var(--o); }
+    46% { stroke-dashoffset: 0; opacity: var(--o); }
+    78% { stroke-dashoffset: 0; opacity: var(--o); }
+    100% { stroke-dashoffset: 0; opacity: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ln { animation: none; stroke-dashoffset: 0; opacity: var(--o); } }
   .bars rect { transform-origin: bottom; transform-box: fill-box; animation: grow 1.2s cubic-bezier(.16,1,.3,1) both; }
   @keyframes grow { from { transform: scaleY(0); } }
 </style>
