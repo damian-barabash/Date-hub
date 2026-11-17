@@ -62,7 +62,7 @@ const tooltipBase = {
   borderColor: 'rgba(255,255,255,0.12)',
   borderWidth: 1,
   padding: [10, 14],
-  textStyle: { color: INK[1], fontFamily: 'Manrope', fontSize: 12.5 },
+  textStyle: { color: INK[1], fontFamily: 'Manrope', fontSize: 13.5 },
   extraCssText: 'border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.45);backdrop-filter:blur(10px);',
 };
 
@@ -81,12 +81,12 @@ export function baseOption() {
 const axisCommon = {
   axisLine: { show: false },
   axisTick: { show: false },
-  axisLabel: { color: INK[3], fontSize: 11, fontFamily: 'Manrope' },
+  axisLabel: { color: INK[2], fontSize: 12.5, fontFamily: 'Manrope' },
   splitLine: { lineStyle: { color: INK.line, type: 'dashed' as const } },
 };
 
 function legend(show: boolean) {
-  return show ? { bottom: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 16, textStyle: { color: INK[2], fontSize: 12 } } : { show: false };
+  return show ? { bottom: 0, icon: 'roundRect', itemWidth: 10, itemHeight: 10, itemGap: 16, textStyle: { color: INK[2], fontSize: 13 } } : { show: false };
 }
 
 function barGradient(c: string, horizontal: boolean) {
@@ -131,7 +131,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
         color: pal,
         tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: spec.chart === 'bar' ? 'shadow' : 'line', shadowStyle: { color: 'rgba(255,255,255,0.03)' }, lineStyle: { color: alpha(main, 0.5) } }, valueFormatter: vf },
         legend: legend(!single),
-        grid: { left: 6, right: h && single ? 70 : 18, top: 18, bottom: single ? 6 : 34, containLabel: true },
+        grid: { left: 6, right: h && single ? 92 : 18, top: 18, bottom: single ? 6 : 38, containLabel: true },
         xAxis: h ? valAxis : catAxis,
         yAxis: h ? catAxis : valAxis,
         dataZoom: !h && cats.length > 40 ? [{ type: 'inside' }] : undefined,
@@ -140,10 +140,10 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
           if (spec.chart === 'bar') {
             return {
               type: 'bar', name: s.name, data: s.data, stack: spec.stack ? 'a' : undefined,
-              barMaxWidth: 22, barGap: '18%',
+              barMaxWidth: 26, barGap: '18%',
               itemStyle: { color: barGradient(c, h), borderRadius: spec.stack ? 2 : h ? [0, 5, 5, 0] : [5, 5, 0, 0] },
               emphasis: { itemStyle: { color: c } },
-              label: single && h ? { show: true, position: 'right', color: INK[2], fontSize: 11, formatter: (p: any) => fmt(p.value, f, true) } : undefined,
+              label: single && h ? { show: true, position: 'right', color: INK[1], fontSize: 13, fontWeight: 600, formatter: (p: any) => fmt(p.value, f, true) } : undefined,
               animationDelay: (idx: number) => idx * 45 + i * 120,
             };
           }
@@ -206,8 +206,8 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
         tooltip: { ...base.tooltip, trigger: 'item', formatter: (p: any) => `<b>${p.name}</b><br/>${fmt(p.value, f)} · ${p.percent}%` },
         legend: { ...legend(data.length <= 10), type: 'scroll', pageTextStyle: { color: INK[2] } },
         graphic: donut ? [{ type: 'group', left: 'center', top: data.length <= 10 ? '40%' : '45%', children: [
-          { type: 'text', style: { text: fmt(total, f, true), fill: INK[1], font: '800 20px Manrope', textAlign: 'center' }, left: 'center' },
-          { type: 'text', top: 28, style: { text: 'Razem', fill: INK[3], font: '600 11px Manrope', textAlign: 'center' }, left: 'center' },
+          { type: 'text', style: { text: fmt(total, f, true), fill: INK[1], font: '700 26px Manrope', textAlign: 'center' }, left: 'center' },
+          { type: 'text', top: 36, style: { text: 'Razem', fill: INK[3], font: '500 12.5px Manrope', textAlign: 'center' }, left: 'center' },
         ] }] : undefined,
         series: [{
           type: 'pie',
@@ -216,7 +216,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
           roseType: spec.chart === 'rose' ? 'area' : undefined,
           padAngle: donut ? 2.5 : 0,
           itemStyle: { borderRadius: donut ? 8 : 5, borderColor: '#151517', borderWidth: donut ? 0 : 2 },
-          label: { color: INK[2], fontSize: 11.5, formatter: (p: any) => (p.percent < 3 ? '' : `${shortName(p.name, 14)}\n{b|${p.percent}%}`), rich: { b: { color: INK[1], fontWeight: 800, fontSize: 12, padding: [3, 0, 0, 0] } } },
+          label: { color: INK[2], fontSize: 12.5, formatter: (p: any) => (p.percent < 4 ? '' : `${shortName(p.name, 14)}\n{b|${Math.round(p.percent)}%}`), rich: { b: { color: INK[1], fontWeight: 700, fontSize: 15, padding: [3, 0, 0, 0] } } },
           labelLine: { lineStyle: { color: 'rgba(255,255,255,0.18)' }, length: 10, length2: 12, smooth: true, showAbove: false },
           labelLayout: { hideOverlap: true },
           emphasis: { scaleSize: 8, itemStyle: { shadowBlur: 24, shadowColor: 'rgba(0,0,0,0.5)' } },
@@ -277,21 +277,47 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
       const fx = guessFmt(spec.x!, f, rows), fy = guessFmt(yk, f, rows);
       const sizes = spec.size ? rows.map((r) => n(r[spec.size!]) ?? 0) : [];
       const smax = Math.max(1, ...sizes);
+      const many = rows.length > 40;
+      // много точек → мелкие полупрозрачные; мало → пузыри умеренного размера
+      const range = many ? 0 : rows.length > 20 ? 14 : 22;
+      const xsv = rows.map((r) => n(r[spec.x!]) ?? 0), ysv = rows.map((r) => n(r[yk]) ?? 0);
+      const mean = (a: number[]) => a.reduce((p, c) => p + c, 0) / Math.max(a.length, 1);
+      const mx = mean(xsv), my = mean(ysv);
+      // подписи: все при малом числе точек, иначе только выбросы
+      const idx = rows.map((_, i) => i);
+      const labelled = new Set<number>(!many ? idx : [
+        ...[...idx].sort((p, q) => xsv[q] - xsv[p]).slice(0, 5),
+        ...[...idx].sort((p, q) => ysv[q] - ysv[p]).slice(0, 2),
+        ...[...idx].sort((p, q) => ysv[p] - ysv[q]).slice(0, 2),
+      ]);
+      const avgLine = { color: 'rgba(255,255,255,0.28)', type: 'dashed' as const, width: 1 };
       return {
         ...base,
         tooltip: { ...base.tooltip, trigger: 'item', formatter: (p: any) => {
+          if (p.componentType !== 'series') return '';
           const r = rows[p.dataIndex];
           return `<b>${spec.name ? r[spec.name] : ''}</b><br/>${label(spec, spec.x!)}: ${fmt(r[spec.x!], fx)}<br/>${label(spec, yk)}: ${fmt(r[yk], fy)}${spec.size ? `<br/>${label(spec, spec.size)}: ${fmt(r[spec.size], 'num')}` : ''}`;
         } },
-        grid: { left: 6, right: 22, top: 22, bottom: 6, containLabel: true },
-        xAxis: { ...axisCommon, type: 'value', scale: true, name: label(spec, spec.x!), nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: INK[3] }, axisLabel: { ...axisCommon.axisLabel, formatter: axisFmt(fx) } },
-        yAxis: { ...axisCommon, type: 'value', scale: true, name: label(spec, yk), nameTextStyle: { color: INK[3] }, axisLabel: { ...axisCommon.axisLabel, formatter: axisFmt(fy) } },
+        grid: { left: 6, right: 34, top: 30, bottom: 26, containLabel: true },
+        xAxis: { ...axisCommon, type: 'value', scale: true, name: label(spec, spec.x!), nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: INK[2], fontSize: 12 }, axisLabel: { ...axisCommon.axisLabel, formatter: axisFmt(fx) } },
+        yAxis: { ...axisCommon, type: 'value', scale: true, name: label(spec, yk), nameTextStyle: { color: INK[2], fontSize: 12, align: 'left' }, axisLabel: { ...axisCommon.axisLabel, formatter: axisFmt(fy) } },
         series: [{
           type: 'scatter',
-          data: rows.map((r, i) => ({ value: [n(r[spec.x!]), n(r[yk])], name: spec.name ? String(r[spec.name]) : '', symbolSize: spec.size ? 8 + Math.sqrt((sizes[i] ?? 0) / smax) * 34 : 12 })),
-          itemStyle: { color: new echarts.graphic.RadialGradient(0.35, 0.35, 0.8, [{ offset: 0, color: mix(main, '#ffffff', 0.25) }, { offset: 1, color: alpha(main, 0.55) }]), borderColor: alpha(main, 0.9), borderWidth: 1 },
-          emphasis: { scale: 1.3, label: { show: true, formatter: '{b}', position: 'top', color: INK[1], fontWeight: 700 } },
-          animationDelay: (i: number) => i * 12,
+          data: rows.map((r, i) => ({
+            value: [n(r[spec.x!]), n(r[yk])], name: spec.name ? String(r[spec.name]) : '',
+            symbolSize: many ? 7 : 9 + (spec.size ? Math.sqrt((sizes[i] ?? 0) / smax) * range : 0),
+            label: { show: labelled.has(i) },
+          })),
+          itemStyle: { color: alpha(main, many ? 0.6 : 0.85), borderColor: '#151517', borderWidth: 1 },
+          label: { formatter: (p: any) => shortName(p.name, 20), position: 'right', distance: 6, color: INK[1], fontSize: 11.5, fontWeight: 500 },
+          labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
+          emphasis: { scale: 1.6, itemStyle: { color: main, borderColor: '#fff' }, label: { show: true, fontWeight: 700 } },
+          markLine: {
+            silent: true, symbol: 'none', animation: true,
+            label: { color: INK[2], fontSize: 11, formatter: (p: any) => `śr. ${fmt(p.value, p.data.xAxis !== undefined ? fx : fy, true)}` },
+            data: [{ xAxis: mx, lineStyle: avgLine, label: { show: false } }, { yAxis: my, lineStyle: avgLine, label: { position: 'insideEndTop' } }],
+          },
+          animationDelay: (i: number) => Math.min(i * 8, 900),
         }],
       };
     }

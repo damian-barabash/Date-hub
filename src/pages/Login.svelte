@@ -64,7 +64,8 @@
         <label class="label" for="login">{t('login.user')}</label>
         <div class="relative mb-4">
           <span class="absolute top-1/2 left-4 -translate-y-1/2 faint"><Icon name="users" size={16} /></span>
-          <input id="login" class="input !h-[50px] !pl-11" autocomplete="username" bind:value={login} placeholder="" />
+          <!-- svelte-ignore a11y_autofocus -->
+          <input id="login" class="input !h-[50px] !pl-11" autocomplete="username" autocapitalize="none" autofocus bind:value={login} />
         </div>
         <label class="label" for="pass">{t('login.pass')}</label>
         <div class="relative">
@@ -72,7 +73,7 @@
           <input id="pass" class="input !h-[50px] !pr-12 !pl-11" type={show ? 'text' : 'password'} autocomplete="current-password" bind:value={pass} />
           <button type="button" class="absolute top-1/2 right-3 -translate-y-1/2 rounded-lg p-1.5 faint hover:text-white" aria-label={t('login.show')} onclick={() => (show = !show)}><Icon name="eye" size={16} /></button>
         </div>
-        {#if err}<div class="mt-4 flex items-center gap-2 rounded-xl bg-[#ef6461]/10 px-4 py-3 text-[13px] font-semibold text-[#ff8f8f] rise"><Icon name="alert" size={15} />{err}</div>{/if}
+        {#if err}<div role="alert" class="mt-4 flex items-center gap-2 rounded-xl bg-[#ef6461]/10 px-4 py-3 text-[13px] font-semibold text-[#ff8f8f] rise"><Icon name="alert" size={15} />{err}</div>{/if}
         <button class="pill pill-accent mt-7 !h-[52px] w-full justify-center !text-[15px]" disabled={busy || !login || !pass}>
           {#if busy}<span class="spin inline-block h-4 w-4 rounded-full border-2 border-black/30 border-t-black"></span>{:else}{t('login.submit')}<Icon name="arrowUpRight" size={17} />{/if}
         </button>

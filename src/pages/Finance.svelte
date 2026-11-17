@@ -42,8 +42,8 @@
 {:else if !R?.revenue}<Empty role="net / netto / przychód" />
 {:else}
   <PageHeader title={t('fin.title')} sub={t('fin.sub')} />
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
-    <Kpi i={0} label={t('kpi.revenue')} value={tot.revenue ?? null} format="pln" icon="coins" group="finance" loading={s.loading} />
+  <div class="kpis">
+    <Kpi hero i={0} label={t('kpi.revenue')} value={tot.revenue ?? null} format="pln" icon="coins" group="finance" loading={s.loading} />
     {#if tot.gross !== undefined}<Kpi i={1} label={t('kpi.gross')} value={tot.gross ?? null} format="pln" icon="wallet" group="ai" loading={s.loading} hint="{t('fin.vat')}: {pln(tot.gross - tot.revenue, true)}" />{/if}
     {#if tot.profit !== undefined}<Kpi i={2} label={t('kpi.profit')} value={tot.profit ?? null} format="pln" icon="trendUp" group="finance" loading={s.loading} hint={tr('netto × marża (nie brutto − netto)', 'net × margin (not gross − net)')} />{/if}
     {#if tot.margin !== undefined}<Kpi i={3} label={t('kpi.margin')} value={tot.margin ?? null} format="pct" icon="percent" group="products" loading={s.loading} />{/if}

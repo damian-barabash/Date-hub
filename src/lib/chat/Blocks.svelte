@@ -13,8 +13,8 @@
   import { csvDownload } from '../data/api';
   import { href } from '../router.svelte';
 
-  let { blocks = [], results = {}, baseDelay = 0, compact = false }:
-    { blocks: any[]; results: Record<string, { columns: string[]; rows: Record<string, any>[] }>; baseDelay?: number; compact?: boolean } = $props();
+  let { blocks = [], results = {}, baseDelay = 0, compact = false, limit = Infinity }:
+    { blocks: any[]; results: Record<string, { columns: string[]; rows: Record<string, any>[] }>; baseDelay?: number; compact?: boolean; limit?: number } = $props();
 
   const KINDS = new Set<string>(['bar', 'line', 'area', 'waterfall', 'pie', 'donut', 'rose', 'funnel', 'treemap', 'sunburst', 'scatter', 'bubble', 'heatmap', 'radar', 'gauge', 'sankey', 'graph', 'bar3d', 'scatter3d', 'surface3d', 'network3d', 'map']);
 
@@ -51,14 +51,14 @@
 </script>
 
 <div class="grid gap-3 {compact ? '' : 'md:grid-cols-2'}">
-  {#each list as b, i}
+  {#each list.slice(0, limit) as b, i}
     {@const res = b.q ? results[b.q] : null}
     {@const wide = compact || b.type === 'kpis' || b.type === 'text' || b.type === 'callout' || b.type === 'table' || ['bar3d', 'scatter3d', 'surface3d', 'network3d', 'map', 'treemap', 'sankey', 'graph', 'heatmap'].includes(b.chart) || list.filter((x) => x.type === 'chart').length === 1}
-    <div class="rise min-w-0 {wide ? 'md:col-span-2' : ''}" style="--i:{i}; animation-delay:{baseDelay + i * 220}ms" data-group={b.group ?? 'ai'}>
+    <div class="rise min-w-0 {wide ? 'md:col-span-2' : ''}" style="--i:{i}; animation-delay:{limit === Infinity ? baseDelay + i * 220 : 0}ms" data-group={b.group ?? 'ai'}>
       {#if b.type === 'kpis'}
         <div class="grid grid-cols-2 gap-3 {b.items?.length > 3 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}">
           {#each b.items ?? [] as k, j}
-            <Kpi i={j} label={k.label} value={typeof k.value === 'number' ? k.value : Number(k.value) || 0} format={k.format ?? 'num'} hint={k.hint ?? ''} group={k.group ?? b.group ?? 'ai'} />
+            <Kpi i={j} label={k.label} text={typeof k.value !== 'number' && isNaN(Number(k.value)) ? String(k.value ?? '—') : ''} value={typeof k.value === 'number' ? k.value : Number(k.value) || 0} format={k.format ?? 'num'} hint={k.hint ?? ''} group={k.group ?? b.group ?? 'ai'} />
           {/each}
         </div>
       {:else if b.type === 'callout'}

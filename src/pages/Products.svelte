@@ -53,7 +53,7 @@
     <button class="pill pill-accent" data-group="products" onclick={() => go(`/chat?q=${encodeURIComponent(tr('Przygotuj raport produktowy: bestsellery, marże, produkty do wycofania', 'Prepare a product report: bestsellers, margins, products to delist'))}`)}><Icon name="ask" size={15} />{t('rep.products')}</button>
   </PageHeader>
 
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.products')} value={d?.tot?.products ?? null} format="int" compact={false} icon="box" group="products" loading={s.loading} hint={d?.tot?.cats ? `${d.tot.cats} ${tr('kategorii', 'categories')}` : ''} />
     <Kpi i={1} label={t('kpi.revenue')} value={d?.tot?.revenue ?? null} format="pln" icon="coins" group="finance" loading={s.loading} />
     {#if R.has('qty')}<Kpi i={2} label={t('kpi.qty')} value={d?.tot?.qty ?? null} format="int" icon="layers" group="products" loading={s.loading} />{/if}

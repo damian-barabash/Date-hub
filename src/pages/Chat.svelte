@@ -15,7 +15,7 @@
   import CountUp from '../lib/ui/CountUp.svelte';
 
   type Step = { key: string; label: string; done: boolean; error?: boolean };
-  type Msg = { id?: string; role: 'user' | 'assistant'; content: any; usage?: any; fresh?: boolean; pending?: boolean; steps?: Step[]; error?: string };
+  type Msg = { id?: string; role: 'user' | 'assistant'; content: any; usage?: any; fresh?: boolean; pending?: boolean; steps?: Step[]; error?: string; shown?: number; built?: boolean };
 
   let messages = $state<Msg[]>([]);
   let input = $state('');
@@ -57,7 +57,7 @@
     input = ''; busy = true;
     if (ta) ta.style.height = '';
     messages.push({ role: 'user', content: { text: q } });
-    const a: Msg = { role: 'assistant', content: {}, pending: true, steps: [], fresh: true };
+    const a: Msg = { role: 'assistant', content: {}, pending: true, steps: [], fresh: true, shown: 0, built: false };
     messages.push(a);
     const idx = messages.length - 1;
     await tick(); scrollDown();
@@ -84,8 +84,34 @@
     } finally {
       busy = false; ctrl = null;
       void loadChats();
-      await tick(); setTimeout(() => scrollDown(), 120);
+      void reveal(idx);
     }
+  }
+
+  const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+  /** Ответ «строится» на глазах: текст → блоки по одному (экран следует за новым блоком) → возврат к началу ответа. */
+  async function reveal(idx: number) {
+    const m = messages[idx];
+    const n = m.content?.blocks?.length ?? 0;
+    if (m.error || !n) { m.built = true; await tick(); toMessage(idx); return; }
+    await tick(); follow();
+    const words = String(m.content?.text ?? '').split(/\s+/).length;
+    await wait(Math.min(words * 18, 2600) + 300);
+    for (let i = 1; i <= n; i++) {
+      messages[idx].shown = i;
+      await tick(); follow();
+      const b = m.content.blocks[i - 1];
+      await wait(b?.type === 'chart' || b?.chart ? 1500 : 650);
+    }
+    messages[idx].built = true;
+    await tick(); follow();
+    await wait(900);
+    toMessage(idx);
+  }
+  function follow() { requestAnimationFrame(() => scroller?.scrollTo({ top: scroller.scrollHeight, behavior: 'smooth' })); }
+  function toMessage(idx: number) {
+    const el = document.getElementById(`msg-${idx}`);
+    if (el && scroller) scroller.scrollTo({ top: el.offsetTop - 16, behavior: 'smooth' });
   }
 
   function onKey(e: KeyboardEvent) {
@@ -127,7 +153,7 @@
 </script>
 
 <div class="-mt-6 -mb-16 flex h-[calc(100dvh-68px)] flex-col" data-group="ai">
-  <div bind:this={scroller} class="flex-1 overflow-y-auto">
+  <div bind:this={scroller} class="relative flex-1 overflow-y-auto">
     <div class="mx-auto w-full max-w-[1060px] px-1 pt-6 pb-10">
       {#if !messages.length}
         <!-- приветствие -->
@@ -163,12 +189,12 @@
               <div class="max-w-[80%] rounded-[22px] rounded-br-md bg-[#232327] px-5 py-3 text-[14.5px] leading-relaxed whitespace-pre-wrap">{m.content.text}</div>
             </div>
           {:else}
-            <div class="mb-10 flex gap-3 md:gap-4" in:fly={{ y: 10, duration: 400 }}>
+            <div id="msg-{mi}" class="mb-10 flex gap-3 md:gap-4" in:fly={{ y: 10, duration: 400 }}>
               <div class="mt-1 hidden h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-[#151517] text-white md:grid">
                 <Logo size={15} text={false} />
               </div>
               <div class="min-w-0 flex-1">
-                {#if m.steps?.length && (m.pending || m.fresh)}
+                {#if m.steps?.length && m.pending}
                   <div class="mb-4 space-y-1.5" transition:slide>
                     {#each m.steps as s (s.key)}
                       <div class="flex items-center gap-2.5 text-[13px]" in:fly={{ x: -8, duration: 300 }} class:muted={!s.done} class:faint={s.done}>
@@ -183,24 +209,27 @@
                   <div class="flex gap-1.5 py-3">{#each [0, 1, 2] as d}<span class="h-1.5 w-1.5 animate-bounce rounded-full bg-white/60" style="animation-delay:{d * 120}ms"></span>{/each}</div>
                 {/if}
                 {#if m.error}
-                  <div class="rounded-2xl border border-[#ef6461]/30 bg-[#ef6461]/[0.06] px-4 py-3 text-[13.5px] text-[#ffb0b0]">{t('chat.error')}: {m.error}</div>
+                  <div class="flex flex-wrap items-center gap-3 rounded-2xl border border-[#ef6461]/30 bg-[#ef6461]/[0.06] px-4 py-3 text-[13.5px] text-[#ffb0b0]" role="alert">
+                    <span class="min-w-0 flex-1">{t('chat.error')}: {m.error}</span>
+                    <button class="pill pill-sm" disabled={busy} onclick={() => send(messages[mi - 1]?.content?.text)}><Icon name="refresh" size={13} />{tr('Spróbuj ponownie', 'Try again')}</button>
+                  </div>
                 {/if}
                 {#if !m.pending && m.content?.text}
                   <Markdown text={m.content.text} animate={m.fresh} />
                 {/if}
                 {#if !m.pending && m.content?.blocks?.length}
-                  <div class="mt-5"><Blocks blocks={m.content.blocks} results={m.content.results ?? {}} baseDelay={m.fresh ? 500 : 0} /></div>
+                  <div class="mt-5"><Blocks blocks={m.content.blocks} results={m.content.results ?? {}} limit={m.fresh && !m.built ? (m.shown ?? 0) : Infinity} /></div>
                 {/if}
-                {#if !m.pending && m.content?.suggestions?.length}
+                {#if !m.pending && m.built !== false && m.content?.suggestions?.length}
                   <div class="mt-5 grid gap-2.5 md:grid-cols-3">
                     {#each m.content.suggestions as s, i}
-                      <button class="sugg-card rise" style="--i:{i}; animation-delay:{m.fresh ? 900 + i * 120 : i * 60}ms" onclick={() => send(s)} disabled={busy}>
+                      <button class="sugg-card rise" style="--i:{i}; animation-delay:{i * 90}ms" onclick={() => send(s)} disabled={busy}>
                         <span class="block text-[13.5px] font-medium">{s}</span>
                       </button>
                     {/each}
                   </div>
                 {/if}
-                {#if !m.pending && (m.content?.text || m.content?.blocks?.length)}
+                {#if !m.pending && m.built !== false && (m.content?.text || m.content?.blocks?.length)}
                   <div class="mt-4 flex flex-wrap items-center gap-2 text-[12px] faint">
                     <button class="pill pill-sm pill-ghost" onclick={() => saveReport(m)}><Icon name="bookmark" size={13} />{t('chat.saveReport')}</button>
                     {#if m.content?.queries?.length}<button class="pill pill-sm pill-ghost" onclick={() => (showSql[mi] = !showSql[mi])}><Icon name="code" size={13} />{t('chat.sql')}</button>{/if}

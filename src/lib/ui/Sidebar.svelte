@@ -89,7 +89,7 @@
     {/each}
 
     <div class="mt-6 mb-2 flex items-center justify-between px-3">
-      <button class="flex items-center gap-1.5 text-[12px] font-medium faint hover:text-white" onclick={() => (chatsOpen = !chatsOpen)}>
+      <button class="flex h-8 items-center gap-1.5 text-[12px] font-medium faint hover:text-white" onclick={() => (chatsOpen = !chatsOpen)}>
         {t('nav.discussions')}<span class="transition-transform" class:rotate-180={chatsOpen}><Icon name="chevron" size={13} /></span>
       </button>
       <div class="flex gap-1">
@@ -104,7 +104,7 @@
           {#each b.items as c (c.id)}
             <a href={href(`/chat/${c.id}`)} class="chat-item group" class:active={route.path === `/chat/${c.id}`}>
               <span class="truncate">{c.title}</span>
-              <button class="ml-auto hidden shrink-0 opacity-60 group-hover:block hover:opacity-100" aria-label="delete" onclick={(e) => delChat(c.id, e)}><Icon name="x" size={13} /></button>
+              <button class="-my-1 -mr-2 ml-auto hidden h-8 w-8 shrink-0 place-items-center opacity-60 group-hover:grid hover:opacity-100" aria-label="delete" onclick={(e) => delChat(c.id, e)}><Icon name="x" size={13} /></button>
             </a>
           {/each}
         {/each}
@@ -137,6 +137,6 @@
   .chat-item { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 10px; font-size: 13.5px; color: var(--color-ink-2); transition: background .2s, color .2s; }
   .chat-item:hover { background: rgb(255 255 255 / 0.04); color: var(--color-ink); }
   .chat-item.active { background: rgb(255 255 255 / 0.07); color: var(--color-ink); }
-  .mini { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 8px; color: var(--color-ink-3); transition: background .2s, color .2s; }
+  .mini { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; color: var(--color-ink-3); transition: background .2s, color .2s; }
   .mini:hover { background: rgb(255 255 255 / 0.06); color: var(--color-ink); }
 </style>

@@ -44,7 +44,7 @@
 {#if !ds}<Empty />
 {:else}
   <PageHeader title={loc?.name?.replace(/\s+/g, ' ') || code} sub={[code, loc?.street, loc?.postal, loc?.city].filter(Boolean).join(' · ')}>
-    <a class="pill" href={href('/locations')}><Icon name="left" size={14} />{t('common.back')}</a>
+    <button class="pill" onclick={() => (history.length > 1 ? history.back() : go('/locations'))}><Icon name="left" size={14} />{t('common.back')}</button>
     <button class="pill pill-accent" data-group="locations" onclick={() => go(`/chat?q=${encodeURIComponent(tr(`Przeanalizuj punkt ${code}: wyniki na tle sieci, najlepsze i najgorsze produkty, rekomendacje`, `Analyse point ${code}: results vs network, best and worst products, recommendations`))}`)}><Icon name="ask" size={15} />{tr('Analiza AI', 'AI analysis')}</button>
   </PageHeader>
 
@@ -56,7 +56,7 @@
     {#if loc?.email}<a class="pill pill-sm" href="mailto:{loc.email}"><Icon name="chat" size={13} />{loc.email}</a>{/if}
   </div>
 
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.revenue')} value={tot.revenue ?? null} format="pln" icon="coins" group="finance" loading={s.loading} hint="{tr('średnia punktu w sieci', 'network avg per point')}: {pln(avgRev, true)}" />
     {#if R?.has('profit')}<Kpi i={1} label={t('kpi.profit')} value={tot.profit ?? null} format="pln" icon="trendUp" group="finance" loading={s.loading} />{/if}
     {#if tot.margin !== undefined}<Kpi i={2} label={t('kpi.margin')} value={tot.margin ?? null} format="pct" icon="percent" group="products" loading={s.loading} hint="{tr('sieć', 'network')}: {pct(s.data?.avg?.margin)}" />{/if}

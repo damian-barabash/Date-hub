@@ -70,7 +70,7 @@
 
 <PageHeader title={t('set.title')} sub={t('set.sub')} />
 
-<div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+<div class="kpis">
   <Kpi i={0} label={tr('Zapytania AI (30 dni)', 'AI requests (30 days)')} value={sum.n} format="int" compact={false} icon="sparkles" group="ai" hint="{int(sum.cached)} {tr('z pamięci', 'from cache')}" />
   <Kpi i={1} label={tr('Tokeny', 'Tokens')} value={sum.prompt + sum.out} format="int" icon="layers" group="managers" hint="in {int(sum.prompt)} · out {int(sum.out)}" />
   <Kpi i={2} label={tr('Trafienia cache', 'Cache hit rate')} value={sum.prompt ? sum.hit / sum.prompt : 0} format="pct" icon="bolt" group="finance" hint={tr('tańsze tokeny wejściowe', 'cheaper input tokens')} />

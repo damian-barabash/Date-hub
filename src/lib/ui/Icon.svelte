@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  // Собственный набор иконок AI DATE HUB (сетка 24, линия 1.6, геометрия из простых примитивов).
+  // Собственный набор иконок AI DATA HUB (сетка 24, линия 1.6, геометрия из простых примитивов).
   export const ICONS: Record<string, string> = {
     grid: '<rect x="3" y="3" width="10" height="7" rx="2"/><rect x="15" y="3" width="6" height="7" rx="2"/><rect x="3" y="12" width="6" height="9" rx="2"/><rect x="11" y="12" width="10" height="9" rx="2"/>',
     ask: '<path d="M4 5h16v11h-9l-5 4v-4H4z"/><path d="M9 12.500v-2M12 12.500V8.500M15 12.500v-3"/>',

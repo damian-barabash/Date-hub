@@ -17,7 +17,9 @@
   // Точки «вырастают» при загрузке, мягкая пульсация, попап в стиле приложения.
   import { onDestroy, onMount } from 'svelte';
   import 'maplibre-gl/dist/maplibre-gl.css';
+  import { fly } from 'svelte/transition';
   import { gColor, mix } from '../charts/theme';
+  import Icon from '../ui/Icon.svelte';
 
   let {
     points = [],
@@ -39,7 +41,7 @@
   let map: any = null;
   let maplibre: any = null;
   let ready = $state(false);
-  let popup: any = null;
+  let sel = $state<MapPoint | null>(null);
 
   function geojson(pts: MapPoint[]) {
     const max = Math.max(1, ...pts.map((p) => p.size || 0));
@@ -159,15 +161,12 @@
             const code = e.features?.[0]?.properties?.code;
             const p = points.find((x) => x.code === code);
             if (!p) return;
-            popup?.remove();
-            const rows = (p.rows ?? []).map(([k, v]) => `<div style="display:flex;justify-content:space-between;gap:18px;font-size:12.5px;padding:3px 0"><span style="color:#71717a">${k}</span><b style="font-weight:700">${v}</b></div>`).join('');
-            const link = detailHref ? `<a href="${detailHref(p.code)}" style="display:block;margin-top:12px;text-align:center;padding:9px;border-radius:999px;background:${gColor(group)};color:#0a0a0b;font-weight:800;font-size:12.5px;text-decoration:none">Szczegóły →</a>` : '';
-            popup = new maplibre.Popup({ offset: 14, maxWidth: '300px' })
-              .setLngLat([p.lng, p.lat])
-              .setHTML(`<div style="min-width:220px"><div style="font-weight:800;font-size:14px;letter-spacing:-.01em">${p.title}</div>${p.subtitle ? `<div style="color:#71717a;font-size:12px;margin:2px 0 10px">${p.subtitle}</div>` : ''}${rows}${p.approx ? '<div style="color:#dcc3a1;font-size:11px;margin-top:6px">≈ lokalizacja przybliżona</div>' : ''}${link}</div>`)
-              .addTo(map);
-            map.easeTo({ center: [p.lng, p.lat], duration: 700 });
+            sel = p;
+            // точка остаётся видимой справа от панели
+            const w = el.clientWidth;
+            map.easeTo({ center: [p.lng, p.lat], duration: 700, offset: [w > 640 ? 150 : 0, w > 640 ? 0 : -el.clientHeight / 4] });
           });
+          map.on('click', (e: any) => { if (!map.queryRenderedFeatures(e.point, { layers: ['pts'] }).length) sel = null; });
         }
       });
     })();
@@ -181,13 +180,37 @@
 
   export function flyTo(code: string) {
     const p = points.find((x) => x.code === code);
-    if (p && map) map.flyTo({ center: [p.lng, p.lat], zoom: 11, speed: 1.2, curve: 1.6 });
+    if (p && map) { sel = p; map.flyTo({ center: [p.lng, p.lat], zoom: 11, speed: 1.2, curve: 1.6, offset: [el.clientWidth > 640 ? 150 : 0, 0] }); }
   }
 
-  onDestroy(() => { popup?.remove(); map?.remove(); map = null; });
+  onDestroy(() => { map?.remove(); map = null; });
 </script>
+
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') sel = null; }} />
 
 <div class="relative w-full overflow-hidden rounded-[18px]" style="height:{typeof height === 'number' ? `${height}px` : height}">
   <div bind:this={el} style="position:absolute; inset:0; width:100%; height:100%"></div>
   {#if !ready}<div class="skeleton absolute inset-0"></div>{/if}
+  {#if sel}
+    {#key sel.code}
+      <div class="absolute top-3 left-3 z-10 flex max-h-[calc(100%-24px)] w-[min(320px,calc(100%-24px))] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#151517]/95 shadow-2xl backdrop-blur-md" transition:fly={{ x: -16, duration: 300 }}>
+        <div class="flex items-start gap-3 p-4 pb-3">
+          <div class="min-w-0 flex-1">
+            <div class="text-[16px] leading-snug font-semibold break-words">{sel.title}</div>
+            {#if sel.subtitle}<div class="mt-1 text-[12.5px] leading-snug break-words faint">{sel.subtitle}</div>{/if}
+          </div>
+          <button class="icon-btn !h-8 !w-8 shrink-0" aria-label="close" onclick={() => (sel = null)}><Icon name="x" size={15} /></button>
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto px-4">
+          {#each sel.rows ?? [] as [k, v]}
+            <div class="flex items-baseline justify-between gap-4 border-t border-white/[0.06] py-2 text-[13px]"><span class="faint">{k}</span><span class="text-right font-semibold break-words">{v}</span></div>
+          {/each}
+          {#if sel.approx}<div class="border-t border-white/[0.06] py-2 text-[12px] text-[#dcc3a1]">≈ lokalizacja przybliżona</div>{/if}
+        </div>
+        {#if detailHref}
+          <div class="p-4 pt-3"><a class="pill pill-accent w-full justify-center" href={detailHref(sel.code)}>Szczegóły<Icon name="right" size={14} /></a></div>
+        {/if}
+      </div>
+    {/key}
+  {/if}
 </div>

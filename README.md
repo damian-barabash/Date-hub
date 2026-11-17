@@ -1,8 +1,8 @@
-# AI DATE HUB · CK Complex
+# AI DATA HUB · CK Complex
 
 Analityka sprzedaży z asystentem AI dla dyrekcji CK Complex: kierownicy, punkty sprzedaży, produkty, marże, mapa sieci, raporty. Asystent (DeepSeek) odpowiada wykresami 2D/3D, mapą, siecią 3D i raportami — wszystko animowane.
 
-**Produkcja:** https://datehub.infinitiq.pl (GitHub Pages) · **Backend:** Supabase `qcmqiviwwhwzxsjmzxkl` (DATE HUB)
+**Produkcja:** https://datahub.infinitiq.pl (GitHub Pages) · **Backend:** Supabase `qcmqiviwwhwzxsjmzxkl` (DATE HUB)
 
 ## Stack
 
@@ -35,7 +35,7 @@ Analityka sprzedaży z asystentem AI dla dyrekcji CK Complex: kierownicy, punkty
 Parametry, cennik i zużycie: **Ustawienia**.
 
 ### Bezpieczeństwo
-- Rejestracja wyłączona; konta tworzy się w Ustawieniach (login → `<login>@datehub.infinitiq.pl`, maile nie są wysyłane).
+- Rejestracja wyłączona; konta tworzy się w Ustawieniach (login → wewnętrzny adres `<login>@datehub.infinitiq.pl` — to tylko identyfikator, maile nie są wysyłane; nie zmieniać razem z domeną).
 - RLS na wszystkich tabelach; schemat `ds` niedostępny bezpośrednio.
 - SQL od AI wykonuje funkcja `ai.run` jako rola `ai_reader` (tylko SELECT na `ds.*` i `locations`), tylko z edge function (service_role), jedna instrukcja, bez funkcji systemowych.
 - Sekrety połączeń w `connector_secrets` (brak polityk RLS → tylko serwer).
@@ -64,4 +64,4 @@ npm run build
 
 1. Repo → **Settings → Pages → Source: GitHub Actions**.
 2. Push do `main` → workflow `.github/workflows/deploy.yml` buduje i publikuje `dist/`.
-3. Domena: `public/CNAME` = `datehub.infinitiq.pl`. W DNS domeny `infinitiq.pl` dodaj **CNAME `datehub` → `damian-barabash.github.io`**, potem w Settings → Pages zaznacz „Enforce HTTPS".
+3. Domena: `public/CNAME` = `datahub.infinitiq.pl`. W DNS domeny `infinitiq.pl` dodaj **CNAME `datahub` → `damian-barabash.github.io`**, potem w Settings → Pages zaznacz „Enforce HTTPS".

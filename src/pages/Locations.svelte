@@ -1,5 +1,6 @@
 <script lang="ts">
   import { active, app } from '../lib/stores/app.svelte';
+  import { keepLocations } from '../lib/stores/keep';
   import { csvDownload, rolesOf, type Row } from '../lib/data/api';
   import { load } from '../lib/data/load.svelte';
   import { locationStats, rollup, withDirectory } from '../lib/data/locs';
@@ -18,11 +19,12 @@
   const s = load(locationStats);
   const all = $derived(withDirectory(s.data ?? [], app.locations));
 
-  let q = $state('');
-  let fManager = $state('');
-  let fKind = $state('');
-  let page = $state(0);
-  let sort = $state<{ by: string; dir: 1 | -1 }>({ by: 'revenue', dir: -1 });
+  let q = $state(keepLocations.q);
+  let fManager = $state(keepLocations.fManager);
+  let fKind = $state(keepLocations.fKind);
+  let page = $state(keepLocations.page);
+  let sort = $state<{ by: string; dir: 1 | -1 }>(keepLocations.sort);
+  $effect(() => { Object.assign(keepLocations, { q, fManager, fKind, page, sort }); });
   const PER = 20;
 
   const filtered = $derived(all
@@ -31,7 +33,8 @@
     .filter((x) => !fKind || x.kind === fKind)
     .sort((a, b) => ((a[sort.by] ?? 0) > (b[sort.by] ?? 0) ? 1 : -1) * sort.dir));
   const pages = $derived(Math.max(1, Math.ceil(filtered.length / PER)));
-  $effect(() => { void q; void fManager; void fKind; page = 0; });
+  let first = true;
+  $effect(() => { void q; void fManager; void fKind; if (first) { first = false; return; } page = 0; });
 
   const managers = $derived([...new Set(all.map((x) => x.manager).filter(Boolean))].sort());
   const kinds = $derived([...new Set(all.map((x) => x.kind).filter((k) => k && k !== '—'))]);
@@ -48,7 +51,7 @@
     <a class="pill" href={href('/map')} data-group="locations"><Icon name="map" size={15} />{t('nav.map')}</a>
   </PageHeader>
 
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.locations')} value={all.length || null} format="int" compact={false} icon="store" group="locations" loading={s.loading} hint="{int(all.filter((x) => x.geo === 'ok' || x.geo === 'approx').length)} {tr('na mapie', 'on the map')}" />
     <Kpi i={1} label={t('kpi.cities')} value={cities.filter((c) => c.city !== '—').length || null} format="int" compact={false} icon="pin" group="locations" loading={s.loading} />
     <Kpi i={2} label={t('kpi.revenue')} value={tot.revenue || null} format="pln" icon="coins" group="finance" loading={s.loading} hint="{tr('śr. na punkt', 'avg per point')}: {pln(all.length ? tot.revenue / all.length : 0, true)}" />
@@ -81,12 +84,12 @@
     <div class="overflow-x-auto">
       <table class="table">
         <thead><tr>
-          <th><button onclick={th('loc')}>{t('loc.code')}</button></th><th><button onclick={th('city')}>{t('loc.city')}</button></th>
+          <th><button class:on={sort.by === 'loc'} onclick={th('loc')}>{t('loc.code')}{sort.by === 'loc' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th><th><button class:on={sort.by === 'city'} onclick={th('city')}>{t('loc.city')}{sort.by === 'city' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>
           <th>{t('loc.manager')}</th>
-          <th class="r"><button onclick={th('revenue')}>{t('kpi.revenue')}</button></th>
-          {#if R.has('profit')}<th class="r"><button onclick={th('margin')}>{t('kpi.margin')}</button></th>{/if}
-          {#if R.has('qty')}<th class="r"><button onclick={th('qty')}>{t('kpi.qty')}</button></th>{/if}
-          <th class="r"><button onclick={th('products')}>{t('kpi.products')}</button></th><th></th>
+          <th class="r"><button class:on={sort.by === 'revenue'} onclick={th('revenue')}>{t('kpi.revenue')}{sort.by === 'revenue' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>
+          {#if R.has('profit')}<th class="r"><button class:on={sort.by === 'margin'} onclick={th('margin')}>{t('kpi.margin')}{sort.by === 'margin' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>{/if}
+          {#if R.has('qty')}<th class="r"><button class:on={sort.by === 'qty'} onclick={th('qty')}>{t('kpi.qty')}{sort.by === 'qty' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>{/if}
+          <th class="r"><button class:on={sort.by === 'products'} onclick={th('products')}>{t('kpi.products')}{sort.by === 'products' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th><th></th>
         </tr></thead>
         <tbody>
           {#each filtered.slice(page * PER, page * PER + PER) as x, i (x.loc)}
@@ -103,6 +106,12 @@
           {/each}
         </tbody>
       </table>
+      {#if !s.loading && !filtered.length}
+        <div class="py-10 text-center">
+          <div class="muted">{tr('Brak punktów dla tych filtrów', 'No points match these filters')}</div>
+          <button class="pill mt-4" onclick={() => { q = ''; fManager = ''; fKind = ''; }}>{tr('Wyczyść filtry', 'Clear filters')}</button>
+        </div>
+      {/if}
     </div>
     <div class="mt-4 flex items-center justify-between text-[13px]">
       <span class="faint">{tr('Strona', 'Page')} {page + 1} / {pages}</span>

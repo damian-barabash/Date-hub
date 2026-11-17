@@ -53,10 +53,10 @@
 {:else if person}
   <!-- карточка кierownika -->
   <PageHeader title={person} sub={tr('Profil kierownika', 'Manager profile')}>
-    <a class="pill" href={href('/managers')}><Icon name="left" size={14} />{t('common.back')}</a>
+    <button class="pill" onclick={() => (history.length > 1 ? history.back() : go('/managers'))}><Icon name="left" size={14} />{t('common.back')}</button>
     <button class="pill pill-accent" data-group="managers" onclick={() => go(`/chat?q=${encodeURIComponent(tr(`Przygotuj raport o kierowniku ${person}: wyniki, punkty, kategorie, ryzyka`, `Prepare a report on manager ${person}: results, points, categories, risks`))}`)}><Icon name="ask" size={15} />{tr('Raport AI', 'AI report')}</button>
   </PageHeader>
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-5">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.revenue')} value={me?.revenue ?? null} format="pln" icon="coins" group="finance" loading={!me} />
     {#if me?.profit !== undefined}<Kpi i={1} label={t('kpi.profit')} value={me?.profit ?? null} format="pln" icon="trendUp" group="finance" />{/if}
     {#if me?.margin !== undefined}<Kpi i={2} label={t('kpi.margin')} value={me?.margin ?? null} format="pct" icon="percent" group="products" hint="{tr('średnia sieci', 'network avg')}: {pct(avg('margin'))}" />{/if}
@@ -84,7 +84,7 @@
   <PageHeader title={t('mg.title')} sub={t('mg.sub')}>
     <a class="pill" href={href('/managers/compare')} data-group="managers"><Icon name="users" size={15} />{t('nav.managers.compare')}</a>
   </PageHeader>
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.managers')} value={(s.data ?? []).length || null} format="int" compact={false} icon="users" group="managers" loading={s.loading} />
     <Kpi i={1} label={t('mg.top')} value={top?.revenue ?? null} format="pln" icon="trendUp" group="finance" hint={top?.name ?? ''} loading={s.loading} />
     <Kpi i={2} label={tr('Średni przychód', 'Average revenue')} value={avg('revenue')} format="pln" icon="coins" group="finance" loading={s.loading} />
@@ -109,12 +109,12 @@
     <div class="overflow-x-auto">
       <table class="table">
         <thead><tr>
-          <th>#</th><th><button onclick={th('name')}>{t('loc.manager')}</button></th>
-          <th class="r"><button onclick={th('revenue')}>{t('kpi.revenue')}</button></th>
-          {#if R.has('profit')}<th class="r"><button onclick={th('profit')}>{t('kpi.profit')}</button></th>{/if}
-          <th class="r"><button onclick={th('margin')}>{t('kpi.margin')}</button></th>
-          {#if R.has('qty')}<th class="r"><button onclick={th('qty')}>{t('kpi.qty')}</button></th>{/if}
-          {#if R.has('location')}<th class="r"><button onclick={th('locations')}>{t('mg.locations')}</button></th><th class="r"><button onclick={th('per_loc')}>{t('mg.perLocation')}</button></th>{/if}
+          <th>#</th><th><button class:on={sort.by === 'name'} onclick={th('name')}>{t('loc.manager')}{sort.by === 'name' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>
+          <th class="r"><button class:on={sort.by === 'revenue'} onclick={th('revenue')}>{t('kpi.revenue')}{sort.by === 'revenue' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>
+          {#if R.has('profit')}<th class="r"><button class:on={sort.by === 'profit'} onclick={th('profit')}>{t('kpi.profit')}{sort.by === 'profit' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>{/if}
+          <th class="r"><button class:on={sort.by === 'margin'} onclick={th('margin')}>{t('kpi.margin')}{sort.by === 'margin' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>
+          {#if R.has('qty')}<th class="r"><button class:on={sort.by === 'qty'} onclick={th('qty')}>{t('kpi.qty')}{sort.by === 'qty' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>{/if}
+          {#if R.has('location')}<th class="r"><button class:on={sort.by === 'locations'} onclick={th('locations')}>{t('mg.locations')}{sort.by === 'locations' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th><th class="r"><button class:on={sort.by === 'per_loc'} onclick={th('per_loc')}>{t('mg.perLocation')}{sort.by === 'per_loc' ? (sort.dir === -1 ? ' ↓' : ' ↑') : ''}</button></th>{/if}
         </tr></thead>
         <tbody>
           {#each list as m, i (m.name)}

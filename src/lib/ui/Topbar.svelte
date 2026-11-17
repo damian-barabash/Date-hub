@@ -24,6 +24,8 @@
   }
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') menu = false; }} />
+
 <header class="no-print flex h-[68px] shrink-0 items-center gap-3 border-b border-white/[0.06] bg-[#0a0a0b]/80 px-4 backdrop-blur-xl md:px-6">
   <button class="icon-btn" aria-label="menu" onclick={toggleSidebar}><Icon name="sidebar" size={17} /></button>
 

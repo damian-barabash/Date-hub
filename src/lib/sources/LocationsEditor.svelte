@@ -43,6 +43,8 @@
   }
 </script>
 
+<svelte:window onkeydown={(e) => { if (e.key === 'Escape') edit = null; }} />
+
 <div data-group="locations">
   <div class="mb-4 flex flex-wrap items-center gap-2">
     {#each Object.entries(counts) as [k, v]}

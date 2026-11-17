@@ -54,8 +54,8 @@
     </button>
   </PageHeader>
 
-  <div class="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 2xl:grid-cols-6">
-    {#if R?.revenue}<Kpi i={0} label={t('kpi.revenue')} value={tot.revenue ?? null} format="pln" icon="coins" group="finance" loading={s.loading} hint={tot.gross ? `${t('kpi.gross')}: ${new Intl.NumberFormat('pl-PL', { notation: 'compact', maximumFractionDigits: 2 }).format(tot.gross)} zł` : ''} />{/if}
+  <div class="kpis">
+    {#if R?.revenue}<Kpi hero i={0} label={t('kpi.revenue')} value={tot.revenue ?? null} format="pln" icon="coins" group="finance" loading={s.loading} hint={tot.gross ? `${t('kpi.gross')}: ${new Intl.NumberFormat('pl-PL', { notation: 'compact', maximumFractionDigits: 2 }).format(tot.gross)} zł` : ''} />{/if}
     {#if R?.has('profit')}<Kpi i={1} label={t('kpi.profit')} value={tot.profit ?? null} format="pln" icon="trendUp" group="finance" loading={s.loading} hint={tr('netto × marża', 'net × margin')} />{/if}
     {#if tot.margin !== undefined}<Kpi i={2} label={t('kpi.margin')} value={tot.margin ?? null} format="pct" icon="percent" group="products" loading={s.loading} hint={tr('ważona przychodem', 'revenue-weighted')} />{/if}
     {#if R?.has('qty')}<Kpi i={3} label={t('kpi.qty')} value={tot.qty ?? null} format="int" icon="box" group="products" loading={s.loading} />{/if}

@@ -55,7 +55,7 @@
     {/if}
   </PageHeader>
 
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.locations')} value={all.length || null} format="int" compact={false} icon="store" group="locations" loading={s.loading} hint="{int(points.length)} {tr('ze współrzędnymi', 'with coordinates')}" />
     <Kpi i={1} label={t('kpi.cities')} value={cities || null} format="int" compact={false} icon="pin" group="locations" />
     <Kpi i={2} label={t('kpi.regions')} value={regions || null} format="int" compact={false} icon="map" group="managers" />

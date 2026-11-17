@@ -21,7 +21,7 @@
   </svg>
   {#if text}
     <div class="leading-none">
-      <div class="brand text-[15px] font-normal whitespace-nowrap" style="letter-spacing:.06em">AI DATE HUB</div>
+      <div class="brand text-[15px] font-normal whitespace-nowrap" style="letter-spacing:.06em">AI DATA HUB</div>
       {#if sub}<div class="brand mt-1.5 text-[8.5px] opacity-55 whitespace-nowrap" style="letter-spacing:.55em">CK COMPLEX</div>{/if}
     </div>
   {/if}

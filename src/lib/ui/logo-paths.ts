@@ -1,4 +1,4 @@
-// Монограмма «DH» (векторизация лого AI DATE HUB). viewBox 0 0 460 360.
+// Монограмма «DH» (векторизация лого AI DATA HUB). viewBox 0 0 460 360.
 export const D_SHAPE = 'M13 15H287A163.5 163.5 0 0 1 287 342H13Z';
 export const CUTS = [
   'M100 85h65v63h103V85h66v190h-66v-69H165v69h-65z', // H

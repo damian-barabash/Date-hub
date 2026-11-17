@@ -34,7 +34,7 @@
 {:else if !R?.has('price')}<Empty role="price / cena (lub netto + ilość)" />
 {:else}
   <PageHeader title={t('fin.prices.title')} sub={t('fin.prices.sub')} />
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={tr('Śr. cena netto / szt.', 'Avg net price / unit')} value={tot.qty ? tot.revenue / tot.qty : null} format="pln" compact={false} icon="coins" group="finance" loading={s.loading} hint={tr('ważona sztukami', 'unit-weighted')} />
     {#if tot.gross_unit}<Kpi i={1} label={tr('Śr. cena brutto / szt.', 'Avg gross price / unit')} value={tot.gross_unit} format="pln" compact={false} icon="wallet" group="ai" loading={s.loading} />{/if}
     <Kpi i={2} label={tr('Mediana ceny pozycji', 'Median line price')} value={tot.median ?? null} format="pln" compact={false} icon="report" group="products" loading={s.loading} />

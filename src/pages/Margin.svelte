@@ -43,7 +43,7 @@
   <PageHeader title={t('fin.margin.title')} sub={t('fin.margin.sub')}>
     <button class="pill pill-accent" data-group="alerts" onclick={() => go(`/chat?q=${encodeURIComponent(tr('Gdzie tracimy marżę? Wskaż produkty, punkty i kierowników z najniższą marżą i zaproponuj działania', 'Where are we losing margin? Point out the products, points and managers with the lowest margin and suggest actions'))}`)}><Icon name="ask" size={15} />{tr('Gdzie tracimy?', 'Where do we lose?')}</button>
   </PageHeader>
-  <div class="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+  <div class="kpis">
     <Kpi i={0} label={t('kpi.margin')} value={s.data?.tot?.margin ?? null} format="pct" icon="percent" group="finance" loading={s.loading} hint={tr('ważona przychodem', 'revenue-weighted')} />
     <Kpi i={1} label={t('ov.negMargin')} value={s.data?.tot?.neg ?? null} format="int" compact={false} icon="trendDown" group="alerts" loading={s.loading} hint={tr('pozycji', 'line items')} />
     <Kpi i={2} label={t('ov.lowMargin')} value={s.data?.tot?.low ?? null} format="int" compact={false} icon="alert" group="products" loading={s.loading} hint={tr('pozycji', 'line items')} />

@@ -1,4 +1,4 @@
-// AI DATE HUB — чат-аналитик на DeepSeek.
+// AI DATA HUB — чат-аналитик на DeepSeek.
 // Экономия токенов:
 //  1) статичный system-промпт + стабильная «карточка» набора данных идут первыми → кэш префикса DeepSeek (≈10× дешевле);
 //  2) модель видит схему и агрегаты, а не сырые строки: пишет SQL, считает Postgres;
@@ -12,7 +12,7 @@ interface Settings { model: string; temperature: number; history_turns: number; 
 interface Query { id: string; sql: string; purpose?: string }
 interface Result { columns: string[]; rows: Record<string, unknown>[]; error?: string; sql: string; purpose?: string }
 
-const SYSTEM = `You are "AI DATE HUB", a senior retail-analytics assistant for company directors (CK Complex, a Polish chain of e-cigarette / vape shops).
+const SYSTEM = `You are "AI DATA HUB", a senior retail-analytics assistant for company directors (CK Complex, a Polish chain of e-cigarette / vape shops).
 You answer questions about sales, managers (kierownicy), shops/warehouses (magazyny), products, margins and finances using a PostgreSQL database.
 Always reply with ONE json object, no prose outside json.
 
