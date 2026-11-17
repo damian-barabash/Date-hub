@@ -75,6 +75,11 @@
           if (!chatId) { chatId = e.data.chat_id; history.replaceState(null, '', `#/chat/${e.data.chat_id}`); route.path = `/chat/${e.data.chat_id}`; route.parts = ['chat', e.data.chat_id]; }
         } else if (e.event === 'query') step(`q-${e.data.id}`, `${t('chat.step.query')}: ${e.data.purpose || e.data.id}`);
         else if (e.event === 'result') { const s = m.steps!.find((x) => x.key === `q-${e.data.id}`); if (s) { s.done = true; s.error = !!e.data.error; s.label += e.data.error ? ' ⚠' : ` · ${e.data.rows}`; } }
+        else if (e.event === 'web') {
+          let what = e.data.q;
+          if (e.data.kind === 'page') { try { what = new URL(e.data.q).hostname.replace(/^www\./, ''); } catch { /* keep */ } }
+          step(`w-${e.data.id}`, `${e.data.kind === 'search' ? tr('Szukam w internecie', 'Searching the web') : tr('Czytam', 'Reading')}: ${what}`);
+        } else if (e.event === 'webresult') { const s = m.steps!.find((x) => x.key === `w-${e.data.id}`); if (s) { s.done = true; s.error = !!e.data.error; if (e.data.error) s.label += ' ⚠'; } }
         else if (e.event === 'final') { m.steps!.forEach((s) => (s.done = true)); m.content = e.data; m.usage = e.data.usage; m.id = e.data.id; m.pending = false; }
         else if (e.event === 'error') { m.pending = false; m.error = e.data.message; }
       }, ctrl.signal);
@@ -219,6 +224,18 @@
                 {/if}
                 {#if !m.pending && m.content?.blocks?.length}
                   <div class="mt-5"><Blocks blocks={m.content.blocks} results={m.content.results ?? {}} limit={m.fresh && !m.built ? (m.shown ?? 0) : Infinity} /></div>
+                {/if}
+                {#if !m.pending && m.built !== false && m.content?.sources?.length}
+                  <div class="mt-5">
+                    <div class="mb-2 flex items-center gap-2 text-[13.5px] faint"><Icon name="globe" size={14} />{tr('Źródła z internetu', 'Web sources')}</div>
+                    <div class="flex flex-wrap gap-2">
+                      {#each m.content.sources as src, i}
+                        <a class="pill pill-sm rise" style="--i:{i}" href={src.url} target="_blank" rel="noopener noreferrer" title={src.url}>
+                          <span class="faint">{i + 1}</span><span class="truncate">{src.title}</span><Icon name="arrowUpRight" size={12} />
+                        </a>
+                      {/each}
+                    </div>
+                  </div>
                 {/if}
                 {#if !m.pending && m.built !== false && m.content?.suggestions?.length}
                   <div class="mt-5 grid gap-2.5 md:grid-cols-3">

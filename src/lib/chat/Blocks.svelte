@@ -67,7 +67,7 @@
 
 <div class="grid gap-3 {compact ? '' : 'md:grid-cols-2'}">
   {#each list.slice(0, limit) as b, i}
-    {@const res = b.q ? results[b.q] : null}
+    {@const res = b.q ? results[b.q] : Array.isArray(b.data) && b.data.length ? { columns: Object.keys(b.data[0]), rows: b.data as Record<string, any>[] } : null}
     {@const wide = compact || b.type === 'kpis' || b.type === 'text' || b.type === 'callout' || b.type === 'table' || ['bar3d', 'scatter3d', 'surface3d', 'network3d', 'map', 'treemap', 'sankey', 'graph', 'heatmap'].includes(b.chart) || list.filter((x) => x.type === 'chart').length === 1}
     <div class="rise min-w-0 {wide ? 'md:col-span-2' : ''}" style="--i:{i}; animation-delay:{limit === Infinity ? baseDelay + i * 220 : 0}ms" data-group={b.group ?? 'ai'}>
       {#if b.type === 'kpis'}
@@ -117,7 +117,7 @@
           {#if b.chart === 'network3d'}
             <Network3D rows={res.rows} source={b.source ?? res.columns[0]} target={b.target ?? res.columns[1]} value={b.value ?? res.columns[2]} group={b.group} format={b.format} height={tall('network3d')} />
           {:else if b.chart === 'map'}
-            <MapView points={mapPoints(b, res.rows)} height={tall('map')} colorScale={res.rows.some((r) => 'marza' in r || 'margin' in r) ? 'margin' : 'value'} group={b.group ?? 'locations'} detailHref={(c) => href(`/locations/${encodeURIComponent(c)}`)} />
+            <MapView points={mapPoints(b, res.rows)} height={tall('map')} colorScale={res.rows.some((r: Record<string, any>) => 'marza' in r || 'margin' in r) ? 'margin' : 'value'} group={b.group ?? 'locations'} detailHref={(c) => href(`/locations/${encodeURIComponent(c)}`)} />
           {:else}
             {@const br = barRows(b, res.rows)}
             <Chart height={barHeight(b, br)} rows={br} spec={b as ChartSpec} />

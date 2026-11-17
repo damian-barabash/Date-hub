@@ -9,7 +9,7 @@
   import Icon from '../lib/ui/Icon.svelte';
   import Chart from '../lib/charts/Chart.svelte';
 
-  type AiS = { model: string; temperature: number; history_turns: number; rows_to_model: number; rows_to_client: number; cache: boolean; cache_ttl_hours: number; max_rounds: number };
+  type AiS = { model: string; temperature: number; history_turns: number; rows_to_model: number; rows_to_client: number; cache: boolean; cache_ttl_hours: number; max_rounds: number; web?: boolean };
   let ai = $state<AiS | null>(null);
   let pricing = $state({ input_hit: 0.028, input_miss: 0.28, output: 0.42, currency: 'USD' });
   let usage = $state<any[]>([]);
@@ -88,6 +88,13 @@
         <div><label class="label" for="mr">{tr('Maks. rund zapytań SQL', 'Max SQL query rounds')}</label><input id="mr" class="input" type="number" min="1" max="6" bind:value={ai.max_rounds} /></div>
         <div><label class="label" for="rm">{tr('Wierszy wyniku dla modelu', 'Result rows sent to model')}</label><input id="rm" class="input" type="number" min="5" max="200" bind:value={ai.rows_to_model} /></div>
         <div><label class="label" for="rc">{tr('Wierszy wyniku dla wykresu', 'Result rows for charts')}</label><input id="rc" class="input" type="number" min="50" max="2000" bind:value={ai.rows_to_client} /></div>
+        <label class="flex cursor-pointer items-start gap-3 rounded-2xl border border-white/10 p-4 sm:col-span-2">
+          <input type="checkbox" class="mt-0.5 h-4 w-4 accent-[#ff6a3d]" checked={ai.web !== false} onchange={(e) => (ai!.web = (e.target as HTMLInputElement).checked)} />
+          <span class="min-w-0">
+            <span class="block text-[15px] font-semibold">{tr('Dostęp do internetu', 'Internet access')}</span>
+            <span class="mt-0.5 block text-[13.5px] faint">{tr('Asystent może szukać w sieci i czytać strony oraz otwarte dane (pogoda, kursy, święta, przepisy, konkurencja). Do zapytań trafiają tylko ogólne hasła, bez danych firmy.', 'The assistant can search the web and read pages and open data (weather, rates, holidays, regulations, competitors). Only generic terms go into queries, no company data.')}</span>
+          </span>
+        </label>
         <div class="flex items-center gap-3 sm:col-span-2">
           <label class="flex cursor-pointer items-center gap-2 text-[14px] font-semibold"><input type="checkbox" class="h-4 w-4 accent-[#ff6a3d]" bind:checked={ai.cache} />{t('set.cache')}</label>
           <input class="input !h-9 !w-24" type="number" min="1" bind:value={ai.cache_ttl_hours} /><span class="text-[13.5px] faint">{tr('godzin', 'hours')}</span>
