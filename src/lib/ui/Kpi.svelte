@@ -2,8 +2,8 @@
   import CountUp from './CountUp.svelte';
   import Icon from './Icon.svelte';
   import type { Fmt } from '../format';
-  let { label, value, format = 'num', hint = '', icon = '', group = 'ai', i = 0, compact = true, loading = false, hero = false, text = '' }:
-    { label: string; value: number | null; format?: Fmt; hint?: string; icon?: string; group?: string; i?: number; compact?: boolean; loading?: boolean; hero?: boolean; text?: string } = $props();
+  let { label, value, format = 'num', hint = '', icon = '', group = 'ai', i = 0, compact = true, loading = false, hero = false, text = '', delta = null, deltaUnit = '%' }:
+    { label: string; value: number | null; format?: Fmt; hint?: string; icon?: string; group?: string; i?: number; compact?: boolean; loading?: boolean; hero?: boolean; text?: string; delta?: number | null; deltaUnit?: string } = $props();
 </script>
 
 <div class="card card-pad kpi rise min-w-0 overflow-hidden" class:hero data-group={group} style="--i:{i}">
@@ -14,7 +14,14 @@
   <div class="val mt-3 truncate leading-none font-semibold tracking-[-0.04em]">
     {#if loading}<div class="skeleton h-8 w-28"></div>{:else if text}{text}{:else}<CountUp {value} {format} {compact} />{/if}
   </div>
-  {#if hint}<div class="mt-2.5 truncate text-[13.5px] faint">{hint}</div>{/if}
+  {#if delta !== null && Number.isFinite(delta)}
+    <div class="mt-2.5 flex min-w-0 items-center gap-2">
+      <span class="flex shrink-0 items-center gap-1 text-[14px] font-semibold" style="color:{delta >= 0 ? '#34d399' : '#f04438'}">
+        <Icon name={delta >= 0 ? 'trendUp' : 'trendDown'} size={15} />{delta >= 0 ? '+' : '−'}{Math.abs(delta).toLocaleString('pl-PL', { maximumFractionDigits: 1 })}{deltaUnit}
+      </span>
+      {#if hint}<span class="truncate text-[13.5px] faint">{hint}</span>{/if}
+    </div>
+  {:else if hint}<div class="mt-2.5 truncate text-[13.5px] faint">{hint}</div>{/if}
 </div>
 
 <style>

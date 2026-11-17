@@ -119,28 +119,37 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
         cats = rows.map((r) => String(r[xKey]));
         series = ys(spec).map((k) => ({ name: label(spec, k), data: rows.map((r) => n(r[k])) }));
       }
+      // разные единицы на одном графике (zł и %) → вторая ось справа, иначе меньшая серия «лежит на нуле»
+      const sf: Fmt[] = spec.series ? series.map(() => f) : ys(spec).map((k) => (ys(spec).length > 1 ? guessFmt(k, f, rows) : f));
+      const kinds = [...new Set(sf)];
+      const dual = !spec.horizontal && !spec.stack && kinds.length === 2 && (kinds.includes('pct') || kinds.includes('int'));
+      const f2: Fmt = dual ? (kinds.includes('pct') ? 'pct' : sf.filter((x) => x === 'int').length <= sf.length / 2 ? 'int' : kinds.find((x) => x !== 'int')) : undefined;
+      const f1: Fmt = dual ? kinds.find((x) => x !== f2) : f;
+      const axisOf = (i: number) => (dual && sf[i] === f2 ? 1 : 0);
       const single = series.length === 1;
       const catAxis = {
         ...axisCommon, type: 'category' as const, data: cats, inverse: h,
         splitLine: { show: false },
-        axisLabel: { ...axisCommon.axisLabel, formatter: (v: string) => shortName(v, h ? 22 : 14), interval: h ? 0 : 'auto', rotate: !h && cats.length > 8 ? 35 : 0 },
+        axisLabel: { ...axisCommon.axisLabel, formatter: (v: string) => shortName(v, h ? 26 : 14), interval: h ? 0 : 'auto', rotate: !h && cats.length > 8 ? 35 : 0 },
       };
-      const valAxis = { ...axisCommon, type: 'value' as const, axisLabel: { ...axisCommon.axisLabel, show: !(h && single), formatter: axisFmt(f) }, splitLine: { ...axisCommon.splitLine, show: !(h && single) } };
+      const valAxis = { ...axisCommon, type: 'value' as const, scale: spec.chart !== 'bar' && !spec.stack, axisLabel: { ...axisCommon.axisLabel, show: !(h && single), formatter: axisFmt(f1) }, splitLine: { ...axisCommon.splitLine, show: !(h && single) } };
+      const valAxis2 = { ...axisCommon, type: 'value' as const, scale: true, position: 'right' as const, axisLabel: { ...axisCommon.axisLabel, formatter: axisFmt(f2) }, splitLine: { show: false } };
       return {
         ...base,
         color: pal,
-        tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: spec.chart === 'bar' ? 'shadow' : 'line', shadowStyle: { color: 'rgba(255,255,255,0.03)' }, lineStyle: { color: alpha(main, 0.5) } }, valueFormatter: vf },
+        tooltip: { ...base.tooltip, trigger: 'axis', axisPointer: { type: spec.chart === 'bar' ? 'shadow' : 'line', shadowStyle: { color: 'rgba(255,255,255,0.03)' }, lineStyle: { color: alpha(main, 0.5) } },
+          formatter: (ps: any[]) => `<div style="margin-bottom:4px;color:#a1a1aa">${ps[0]?.axisValueLabel ?? ''}</div>` + ps.map((p) => `<div style="display:flex;justify-content:space-between;gap:18px"><span>${p.marker}${p.seriesName}</span><b>${fmt(p.value, dual ? sf[p.seriesIndex] : f)}</b></div>`).join('') },
         legend: legend(!single),
         grid: { left: 6, right: h && single ? 104 : 18, top: 18, bottom: single ? 6 : 38, containLabel: true },
         xAxis: h ? valAxis : catAxis,
-        yAxis: h ? catAxis : valAxis,
+        yAxis: h ? catAxis : dual ? [valAxis, valAxis2] : valAxis,
         dataZoom: !h && cats.length > 40 ? [{ type: 'inside' }] : undefined,
         series: series.map((s, i) => {
           const c = pal[i % pal.length];
           if (spec.chart === 'bar') {
             return {
-              type: 'bar', name: s.name, data: s.data, stack: spec.stack ? 'a' : undefined,
-              barMaxWidth: 26, barGap: '18%',
+              type: 'bar', name: s.name, data: s.data, stack: spec.stack ? 'a' : undefined, yAxisIndex: h ? undefined : axisOf(i),
+              barMaxWidth: 26, barMinWidth: 6, barCategoryGap: '34%', barGap: '18%',
               itemStyle: { color: barGradient(c, h), borderRadius: spec.stack ? 2 : h ? [0, 5, 5, 0] : [5, 5, 0, 0] },
               emphasis: { itemStyle: { color: c } },
               label: single && h ? { show: true, position: 'right', color: INK[1], fontSize: 14.5, fontWeight: 600, formatter: (p: any) => fmt(p.value, f, true) } : undefined,
@@ -148,7 +157,7 @@ export function buildOption(spec0: ChartSpec, rows: Row[]): Record<string, any> 
             };
           }
           return {
-            type: 'line', name: s.name, data: s.data, smooth: 0.35, showSymbol: false, symbolSize: 7, stack: spec.stack ? 'a' : undefined,
+            type: 'line', name: s.name, data: s.data, yAxisIndex: axisOf(i), smooth: 0.35, showSymbol: cats.length <= 36, symbol: 'circle', symbolSize: 8, stack: spec.stack ? 'a' : undefined,
             lineStyle: { width: 2.2, color: c },
             itemStyle: { color: c, borderColor: '#0a0a0b', borderWidth: 2 },
             areaStyle: spec.chart === 'area' || single ? { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: alpha(c, 0.32) }, { offset: 1, color: alpha(c, 0) }]) } : undefined,

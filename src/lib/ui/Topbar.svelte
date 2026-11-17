@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { fly } from 'svelte/transition';
+  import { scale } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { app, active, loadDatasets } from '../stores/app.svelte';
   import { i18n, setLang, t } from '../i18n.svelte';
   import { href, route } from '../router.svelte';
@@ -27,7 +28,7 @@
 <svelte:window onkeydown={(e) => { if (e.key === 'Escape') menu = false; }} />
 
 <header class="no-print relative z-30 flex h-[68px] shrink-0 items-center gap-3 border-b border-white/[0.06] bg-[#0a0a0b]/80 px-4 backdrop-blur-xl md:px-6">
-  <button class="icon-btn" aria-label="menu" onclick={toggleSidebar}><Icon name="sidebar" size={17} /></button>
+  <button class="icon-btn" aria-label="menu" aria-expanded={!app.sidebarCollapsed} onclick={toggleSidebar}><span class="grid transition-transform duration-500" style="transition-timing-function: var(--ease-out-expo)" class:-scale-x-100={app.sidebarCollapsed}><Icon name="sidebar" size={17} /></span></button>
 
   <div class="relative min-w-0">
     {#if ds}
@@ -43,7 +44,7 @@
     {/if}
     {#if menu}
       <button class="fixed inset-0 z-40 cursor-default" aria-label="close" onclick={() => (menu = false)}></button>
-      <div class="absolute top-12 left-0 z-50 w-[340px] rounded-2xl border border-white/10 bg-[#151517]/98 p-2 shadow-2xl backdrop-blur-xl" transition:fly={{ y: -6, duration: 220 }}>
+      <div class="absolute top-12 left-0 z-50 w-[340px] rounded-2xl border border-white/10 bg-[#151517]/98 p-2 shadow-2xl backdrop-blur-xl" style="transform-origin: top left" in:scale={{ start: 0.94, duration: 260, easing: cubicOut }} out:scale={{ start: 0.96, duration: 160, easing: cubicOut }}>
         <div class="px-3 pt-2 pb-1 text-[12.5px] font-bold tracking-widest uppercase faint">{t('src.datasets')}</div>
         {#each ready as d (d.id)}
           <button class="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-white/5" onclick={() => pick(d.id)}>

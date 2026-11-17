@@ -50,7 +50,8 @@
       if (entries.some((e) => e.isIntersecting)) { visible = true; io?.disconnect(); }
     }, { rootMargin: '80px' });
     io.observe(el);
-    ro = new ResizeObserver(() => chart?.resize({ animation: { duration: 250 } }));
+    let rt = 0;
+    ro = new ResizeObserver(() => { clearTimeout(rt); rt = window.setTimeout(() => chart?.resize({ animation: { duration: 350, easing: 'cubicOut' } }), 90); });
     ro.observe(el);
   });
 

@@ -31,6 +31,21 @@
     return { ...b, type, chart };
   }
   const list = $derived(blocks.map(norm));
+  const ysOf = (b: any): string[] => (Array.isArray(b.y) ? b.y : b.y ? [b.y] : []);
+  /** Горизонтальный рейтинг с одной серией: по убыванию, чтобы порядок читался сразу. */
+  function barRows(b: any, rows: Record<string, any>[]) {
+    if (b.chart !== 'bar' || !b.horizontal || b.series || ysOf(b).length !== 1) return rows;
+    const k = ysOf(b)[0];
+    if (!rows.every((r) => typeof r[k] === 'number')) return rows;
+    return [...rows].sort((p, q) => q[k] - p[k]);
+  }
+  /** Высота растёт с числом строк: у каждой строки своя «полка» и воздух, подписи не слипаются. */
+  function barHeight(b: any, rows: Record<string, any>[]) {
+    if (b.chart !== 'bar' || !b.horizontal) return tall(b.chart);
+    const cats = b.series ? new Set(rows.map((r) => r[b.x])).size : rows.length;
+    const series = b.series ? (b.stack ? 1 : new Set(rows.map((r) => r[b.series])).size) : b.stack ? 1 : Math.max(ysOf(b).length, 1);
+    return Math.max(280, cats * (18 + Math.min(series, 4) * 16) + (series > 1 ? 70 : 30));
+  }
   const tall = (k: Kind) => (k === 'network3d' ? 580 : ['bar3d', 'scatter3d', 'surface3d', 'map', 'treemap', 'sankey', 'graph', 'sunburst'].includes(k) ? 460 : k === 'gauge' ? 260 : 360);
 
   function mapPoints(b: any, rows: Record<string, any>[]) {
@@ -104,7 +119,8 @@
           {:else if b.chart === 'map'}
             <MapView points={mapPoints(b, res.rows)} height={tall('map')} colorScale={res.rows.some((r) => 'marza' in r || 'margin' in r) ? 'margin' : 'value'} group={b.group ?? 'locations'} detailHref={(c) => href(`/locations/${encodeURIComponent(c)}`)} />
           {:else}
-            <Chart height={tall(b.chart)} rows={res.rows} spec={b as ChartSpec} />
+            {@const br = barRows(b, res.rows)}
+            <Chart height={barHeight(b, br)} rows={br} spec={b as ChartSpec} />
           {/if}
         </div>
       {/if}

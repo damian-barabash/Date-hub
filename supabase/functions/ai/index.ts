@@ -27,6 +27,7 @@ If no data is needed (greeting, general question) answer immediately with the fi
 - Read-only SELECT/WITH only, one statement, no semicolons. Use only tables described in DATA CONTEXT.
 - ALWAYS aggregate in SQL (sum/avg/count/group by). Never fetch raw rows unless the user explicitly asks for a list; then LIMIT ≤ 100.
 - Charts: ≤ 30 categories (use ORDER BY … LIMIT, group the rest into "Inne" only when helpful). Heatmaps/3D: ≤ 25×25.
+- Rankings: default LIMIT 10–15 unless the user asks for more; the number in a chart title ("Top 15") MUST equal the LIMIT of its query. Rankings are horizontal bars sorted descending.
 - Round money to 2 decimals: round(sum(x)::numeric, 2). Percentages as fractions 0..1 rounded to 4 decimals (format "pct" renders them).
 - Weighted margin = sum(profit)/nullif(sum(net),0). Gross (brutto) includes VAT — profit is NOT gross minus net.
 - Use readable column aliases in snake_case (they become axis names). Text matching: ILIKE with % for names.
@@ -52,8 +53,8 @@ table: {"type":"table","q":"q1","title":"…","columns":["col",…]}
 callout: {"type":"callout","tone":"warn|info|good","md":"…"}
 text: {"type":"text","md":"…"}  (for long reports: sections between visuals)
 GROUP (accent colour family): managers | locations | products | finance | alerts | ai
-Prefer 1–2 visuals for a simple question; for "raport"/report requests build a full report: kpis + 3–6 charts + text sections + callouts.
-Pick the visual that best shows the insight (ranking → horizontal bar, share → donut/treemap, distribution → bar of buckets, relation → scatter/bubble, structure → sankey/network3d, geography → map). Use 3D only when asked or when it truly adds value.
+Whenever the data has a time dimension (date column or several periods) and the question concerns dynamics, growth, seasonality, "trend", "miesiąc do miesiąca", add a line chart even if not explicitly asked. Prefer 1–2 visuals for a simple question; for "raport"/report requests build a full report: kpis + 3–6 charts + text sections + callouts.
+Pick the visual that best shows the insight (change over time → line (or area for one series; x = period/date ascending, y = one or several metrics as separate lines), ranking → horizontal bar, share → donut/treemap, distribution → bar of buckets, relation → scatter/bubble, structure → sankey/network3d, geography → map). Use 3D only when asked or when it truly adds value.
 
 ## Text
 "text": 60–160 words of markdown in the user's language (Polish by default, English if the user writes English / lang=en). Structure:
@@ -77,7 +78,7 @@ function toCsv(r: Result, max: number): string {
 }
 
 // «Карточка» набора данных — стабильна между запросами (кэшируется DeepSeek как префикс)
-function datasetCard(d: Record<string, any>, locCount: number): string {
+function datasetCard(d: Record<string, any>, locCount: number, others: Record<string, any>[] = []): string {
   const lines: string[] = [];
   lines.push(`DATA CONTEXT`);
   lines.push(`Main table: ds.${d.table_name}  (dataset "${d.name}", ${d.row_count} rows${d.meta?.period ? `, period ${d.meta.period}` : ''})`);
@@ -104,6 +105,13 @@ function datasetCard(d: Record<string, any>, locCount: number): string {
   if (r.qty) hints.push(`units = sum(${r.qty})`);
   if (r.margin) hints.push(`${r.margin} is per-row margin ratio (0..1, negatives = loss)`);
   if (hints.length) lines.push(`Metric hints: ${hints.join('; ')}`);
+  const same = others.filter((o) => o.id !== d.id && o.meta?.period && JSON.stringify(o.roles) === JSON.stringify(d.roles)).sort((x, y) => String(x.meta.period).localeCompare(String(y.meta.period)));
+  if (same.length) {
+    lines.push(`Other periods with the SAME columns (for trends / period comparison use UNION ALL, adding a literal period column, e.g. SELECT '${d.meta?.period ?? 'current'}' AS okres, … FROM ds.${d.table_name} UNION ALL SELECT '${same[0].meta.period}', … FROM ds.${same[0].table_name}):`);
+    for (const o of same.slice(0, 36)) lines.push(`- ds.${o.table_name} — period ${o.meta.period}, ${o.row_count} rows`);
+  } else if (!r.date) {
+    lines.push('Time coverage: ONE period only, no date column — trends over time are NOT available. If asked for a trend, say so plainly and suggest uploading more months; never invent other periods.');
+  }
   lines.push(`Lookup table: public.locations(code, name, city, street, postal, region [voivodeship], branch [sales branch e.g. RG_01], kind [Stacjonarny = street shop | Wyspa = mall island], email, lat, lng) — ${locCount} shops geocoded${r.location ? `, join on ds.${d.table_name}.${r.location} = locations.code` : ''}`);
   return lines.join('\n');
 }
@@ -142,6 +150,7 @@ Deno.serve(async (req) => {
       ]);
       const s: Settings = { model: 'deepseek-chat', temperature: 0.3, history_turns: 6, rows_to_model: 40, rows_to_client: 500, cache: true, cache_ttl_hours: 24, max_rounds: 3, ...(st?.value ?? {}) };
       const dataset = dsRes.data;
+      const { data: others } = await db.from('datasets').select('id, table_name, roles, meta, row_count').eq('status', 'ready').order('created_at');
 
       // чат
       let chatId: string = body.chat_id;
@@ -181,7 +190,7 @@ Deno.serve(async (req) => {
 
       const msgs: { role: string; content: string }[] = [
         { role: 'system', content: SYSTEM },
-        { role: 'system', content: dataset ? datasetCard(dataset, locCount ?? 0) : 'DATA CONTEXT: no dataset loaded yet. Tell the user to upload data in "Źródła danych".' },
+        { role: 'system', content: dataset ? datasetCard(dataset, locCount ?? 0, others ?? []) : 'DATA CONTEXT: no dataset loaded yet. Tell the user to upload data in "Źródła danych".' },
         ...history,
         { role: 'user', content: `${message}\n\n(lang=${lang})` },
       ];

@@ -20,6 +20,7 @@
   type Item = { key: Key; path: string; icon: string; group: string; children?: { key: Key; path: string }[] };
   const analytics: Item[] = [
     { key: 'nav.overview', path: '/', icon: 'grid', group: 'ai' },
+    { key: 'nav.trends', path: '/trends', icon: 'trendUp', group: 'finance' },
     { key: 'nav.managers', path: '/managers', icon: 'users', group: 'managers', children: [
       { key: 'nav.managers.all', path: '/managers' }, { key: 'nav.managers.compare', path: '/managers/compare' } ] },
     { key: 'nav.locations', path: '/locations', icon: 'store', group: 'locations', children: [
@@ -63,15 +64,18 @@
     if (ids.length) await supabase.from('chats').delete().in('id', ids);
     await loadChats();
   }
+  let wide = $state(typeof window !== 'undefined' && window.innerWidth >= 1024);
   const user = $derived(app.session?.user?.user_metadata?.username ?? app.session?.user?.email?.split('@')[0] ?? '');
 </script>
+
+<svelte:window onresize={() => (wide = window.innerWidth >= 1024)} />
 
 {#if app.sidebarOpen}
   <button class="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" aria-label="close" transition:fade={{ duration: 200 }} onclick={() => (app.sidebarOpen = false)}></button>
 {/if}
 
 <aside class="no-print fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-white/[0.06] bg-[#0c0c0d] transition-transform duration-500 lg:static lg:translate-x-0"
-  class:-translate-x-full={!app.sidebarOpen} class:lg:hidden={app.sidebarCollapsed} style="transition-timing-function: var(--ease-out-expo)">
+  class:-translate-x-full={!app.sidebarOpen} class:collapsed={app.sidebarCollapsed} inert={app.sidebarCollapsed && wide} style="transition-timing-function: var(--ease-out-expo)">
   <div class="flex h-[68px] items-center justify-between px-5">
     <a href={href('/')} class="text-white"><Logo size={26} /></a>
   </div>
@@ -142,6 +146,14 @@
 </aside>
 
 <style>
+  /* десктоп: панель плавно уезжает влево, контент расширяется; содержимое гаснет чуть раньше */
+  @media (min-width: 1024px) {
+    aside { transition: margin-left .55s var(--ease-out-expo), opacity .3s ease, visibility 0s linear 0s; }
+    aside.collapsed { margin-left: -272px; opacity: 0; visibility: hidden; transition: margin-left .55s var(--ease-out-expo), opacity .25s ease, visibility 0s linear .55s; }
+    aside > :global(*) { transition: transform .55s var(--ease-out-expo); }
+    aside.collapsed > :global(*) { transform: translateX(-24px); }
+  }
+
   .nav-item { display: flex; align-items: center; gap: 11px; height: 40px; padding: 0 12px; border-radius: 12px; font-size: 15px; font-weight: 500; color: var(--color-ink-2); transition: background .25s, color .25s; margin-bottom: 2px; }
   .nav-item:hover { background: rgb(255 255 255 / 0.04); color: var(--color-ink); }
   .nav-item.active { color: var(--color-ink); background: rgb(255 255 255 / 0.07); }

@@ -275,8 +275,10 @@
 </div>
 
 <style>
-  .composer { border-radius: 22px; border: 1px solid var(--color-line-2); background: var(--color-surface); transition: border-color .3s; }
-  .composer:focus-within { border-color: rgb(255 255 255 / 0.3); }
+  .composer { border-radius: 22px; border: 1px solid var(--color-line-2); background: var(--color-surface); transition: border-color .3s, box-shadow .3s; }
+  .composer:focus-within { border-color: rgb(255 255 255 / 0.45); box-shadow: 0 0 0 3px rgb(255 255 255 / 0.06); }
+  /* фокус показывает рамка всего поля, а не отдельная обводка вокруг текста */
+  .composer textarea:focus, .composer textarea:focus-visible { outline: none; box-shadow: none; }
   .sugg { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; padding: 15px 18px; border-radius: 16px; border: 1px solid var(--color-line); background: var(--color-surface); font-size: 14px; font-weight: 500; color: var(--color-ink-2); transition: border-color .25s, color .25s; }
   .sugg:hover { border-color: rgb(255 255 255 / 0.22); color: var(--color-ink); }
   .sugg-card { text-align: left; padding: 14px 16px; border-radius: 16px; border: 1px solid var(--color-line); background: var(--color-surface); color: var(--color-ink-2); transition: border-color .25s, color .25s; }
