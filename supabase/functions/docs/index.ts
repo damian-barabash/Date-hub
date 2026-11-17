@@ -2,7 +2,7 @@
 // (тип, дата, контрагент, номер, суммы, краткое содержание). Модель видит только начало и конец текста.
 import { admin, cors, deepseek, json, parseJson, requireUser } from '../_shared/util.ts';
 
-const MAX_CATEGORIES = 12; // с запасом до лимита меню в 15 вкладок
+const MAX_CATEGORIES = 20; // вкладки документов; общий лимит меню — 30 пунктов
 type Cat = { name: string; desc: string };
 
 async function getTaxonomy(db: ReturnType<typeof admin>): Promise<Cat[]> {

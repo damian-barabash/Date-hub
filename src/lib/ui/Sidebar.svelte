@@ -20,7 +20,7 @@
   }
 
   type Item = { key: Key; path: string; icon: string; group: string; children?: { key: Key; path: string }[] };
-  const MAX_TABS = 15; // потолок вкладок меню вместе с динамическими
+  const MAX_TABS = 30; // потолок пунктов меню вместе с динамическими вкладками
 
   // Аналитика продаж появляется только когда есть таблица с нужными колонками
   const analytics = $derived.by((): Item[] => {
@@ -49,6 +49,8 @@
   const CAT_ICONS: [RegExp, string][] = [[/faktur|rozlicz|płatn|platn|finans/i, 'wallet'], [/zamówi|zamowi/i, 'box'], [/umow|porozum|prawn/i, 'bookmark'], [/audyt|kontrol/i, 'search'], [/kampani|marketing|promoc/i, 'bolt'],
     [/budżet|budzet|koszt/i, 'coins'], [/raport|analiz|wynik/i, 'report'], [/prezent|ofert/i, 'layers'], [/sklep|punkt|mystery/i, 'store'], [/program|lojaln|klub|club/i, 'users'], [/techn|system|platform|it\b/i, 'code'], [/korespond|mail/i, 'chat']];
   const catIcon = (c: string) => CAT_ICONS.find(([re]) => re.test(c))?.[1] ?? 'report';
+  const tabsOn = $derived(route.path.startsWith('/docs/c/'));
+  let tabsOpen = $state(true);
 
   const isOn = (p: string) => (p === '/' ? route.path === '/' : route.path === p || route.path.startsWith(p + '/'));
   const groupOn = (it: Item) => isOn(it.path) || !!it.children?.some((c) => isOn(c.path));
@@ -104,12 +106,20 @@
     <a href={href('/')} class="nav-item" class:active={route.path === '/' || route.path === '/docs'}><Icon name="grid" size={17} /><span>{tr('Przegląd', 'Overview')}</span>
 </a>
     {#if docTabs.length}
-      <div class="mt-5 mb-2 px-3 text-[13px] font-medium faint">{tr('Zakładki', 'Tabs')}</div>
-      {#each docTabs as c (c.category)}
-        <a href={href(catHref(c.category))} class="nav-item" class:active={decodeURIComponent(route.path) === `/docs/c/${c.category}`} transition:slide={{ duration: 260 }}>
-          <Icon name={catIcon(c.category)} size={17} /><span class="truncate">{c.category}</span><span class="ml-auto shrink-0 text-[12.5px] faint">{c.n}</span>
-        </a>
-      {/each}
+      <button class="nav-item w-full" class:active={tabsOn && !tabsOpen} aria-expanded={tabsOpen} onclick={() => (tabsOpen = !tabsOpen)}>
+        <Icon name="layers" size={17} /><span class="truncate">{tr('Zakładki', 'Tabs')}</span>
+        <span class="ml-auto shrink-0 text-[12.5px] faint">{docTabs.length}</span>
+        <span class="shrink-0 transition-transform duration-300" class:rotate-180={tabsOpen}><Icon name="chevron" size={15} /></span>
+      </button>
+      {#if tabsOpen}
+        <div class="relative ml-[22px] border-l border-white/[0.08] py-1 pl-3" transition:slide={{ duration: 280 }}>
+          {#each docTabs as c (c.category)}
+            <a href={href(catHref(c.category))} class="sub-item flex items-center gap-2" class:active={decodeURIComponent(route.path) === `/docs/c/${c.category}`}>
+              <span class="min-w-0 flex-1 truncate">{c.category}</span><span class="shrink-0 text-[12.5px] faint">{c.n}</span>
+            </a>
+          {/each}
+        </div>
+      {/if}
     {/if}
     {#if analytics.length || hasMap}<div class="mt-5 mb-2 px-3 text-[13px] font-medium faint">{t('nav.analytics')}</div>{/if}
     {#each analytics as it (it.key)}
