@@ -12,7 +12,7 @@ const root = new URL('../supabase/functions/', import.meta.url).pathname;
 copyFileSync(new URL('../src/lib/data/infer.ts', import.meta.url).pathname, join(root, '_shared/infer.ts'));
 
 const shared = ['_shared/util.ts', '_shared/infer.ts', '_shared/web.ts'];
-const names = process.argv.slice(2).length ? process.argv.slice(2) : ['ai', 'users', 'geo', 'connect'];
+const names = process.argv.slice(2).length ? process.argv.slice(2) : ['ai', 'users', 'geo', 'connect', 'docs'];
 
 for (const name of names) {
   const form = new FormData();

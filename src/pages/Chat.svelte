@@ -8,6 +8,7 @@
   import { go, href, route } from '../lib/router.svelte';
   import { int } from '../lib/format';
   import { agg, rolesOf } from '../lib/data/api';
+  import { docs } from '../lib/docs/store.svelte';
   import Blocks from '../lib/chat/Blocks.svelte';
   import Markdown from '../lib/chat/Markdown.svelte';
   import Icon from '../lib/ui/Icon.svelte';
@@ -75,6 +76,8 @@
           if (!chatId) { chatId = e.data.chat_id; history.replaceState(null, '', `#/chat/${e.data.chat_id}`); route.path = `/chat/${e.data.chat_id}`; route.parts = ['chat', e.data.chat_id]; }
         } else if (e.event === 'query') step(`q-${e.data.id}`, `${t('chat.step.query')}: ${e.data.purpose || e.data.id}`);
         else if (e.event === 'result') { const s = m.steps!.find((x) => x.key === `q-${e.data.id}`); if (s) { s.done = true; s.error = !!e.data.error; s.label += e.data.error ? ' ⚠' : ` · ${e.data.rows}`; } }
+        else if (e.event === 'docs') step(`d-${e.data.id}`, `${e.data.kind === 'open' ? tr('Czytam dokument', 'Reading document') : tr('Szukam w dokumentach', 'Searching documents')}: ${e.data.q}`);
+        else if (e.event === 'docsresult') { const s = m.steps!.find((x) => x.key === `d-${e.data.id}`); if (s) { s.done = true; s.error = !!e.data.error; if (e.data.rows !== undefined) s.label += ` · ${e.data.rows}`; } }
         else if (e.event === 'web') {
           let what = e.data.q;
           if (e.data.kind === 'page') { try { what = new URL(e.data.q).hostname.replace(/^www\./, ''); } catch { /* keep */ } }
@@ -133,7 +136,8 @@
   // приветствие: KPI набора данных + подсказки по ролям
   let stats = $state<Record<string, number> | null>(null);
   $effect(() => {
-    const d = ds; if (!d) { stats = null; return; }
+    const d = ds;
+    if (!d) { stats = docs.stats?.total ? { documents: docs.stats.total, tabs: docs.stats.cats.length, types: docs.stats.types.length } : null; return; }
     const { r } = rolesOf(d);
     const m = [
       ...(r.location ? [{ fn: 'count_distinct', col: r.location, as: 'locations' }] : []),
@@ -144,7 +148,15 @@
     agg(d, { metrics: m }).then(([x]) => (stats = x)).catch(() => {});
   });
   const suggestions = $derived.by(() => {
-    if (!ds) return [tr('Co potrafisz?', 'What can you do?'), tr('Jak wgrać dane z Excela?', 'How do I upload Excel data?')];
+    if (!ds && docs.stats?.total) return [
+      tr('Przygotuj przegląd wszystkich dokumentów: kategorie, kwoty i najważniejsze ustalenia', 'Prepare an overview of all documents: categories, amounts and key findings'),
+      tr('Pokaż faktury i zamówienia z kwotami w układzie miesięcznym', 'Show invoices and orders with amounts by month'),
+      tr('Którzy kontrahenci pojawiają się najczęściej i na jakie kwoty?', 'Which counterparties appear most often and for what amounts?'),
+      tr('Jakie umowy i porozumienia mamy? Zrób tabelę ze stronami, datami i kwotami', 'Which contracts and agreements do we have? Make a table with parties, dates and amounts'),
+      tr('Co wynika z materiałów audytowych? Wypisz ustalenia i otwarte pytania', 'What do the audit materials say? List findings and open questions'),
+      tr('Pokaż sklepy na mapie', 'Show the shops on the map'),
+    ];
+    if (!ds) return [tr('Co potrafisz?', 'What can you do?'), tr('Jak wgrać dokumenty?', 'How do I upload documents?')];
     const { r } = rolesOf(ds);
     const s: string[] = [];
     if (r.manager) s.push(tr('Pokaż top 5 kierowników według przychodu i ich marżę', 'Show top 5 managers by revenue and their margin'));
@@ -169,6 +181,9 @@
           {#if stats}
             <div class="mt-9 grid w-full max-w-[760px] grid-cols-2 gap-3 md:grid-cols-4">
               {#each [
+                { v: stats.documents, l: tr('Dokumenty', 'Documents'), i: 'report', g: 'ai' },
+                { v: stats.tabs, l: tr('Zakładki', 'Tabs'), i: 'grid', g: 'ai' },
+                { v: stats.types, l: tr('Rodzaje dokumentów', 'Document types'), i: 'layers', g: 'ai' },
                 { v: stats.locations, l: t('kpi.locations'), i: 'store', g: 'locations' },
                 { v: stats.products, l: t('kpi.products'), i: 'box', g: 'products' },
                 { v: stats.managers, l: t('kpi.managers'), i: 'users', g: 'managers' },
@@ -224,6 +239,16 @@
                 {/if}
                 {#if !m.pending && m.content?.blocks?.length}
                   <div class="mt-5"><Blocks blocks={m.content.blocks} results={m.content.results ?? {}} limit={m.fresh && !m.built ? (m.shown ?? 0) : Infinity} /></div>
+                {/if}
+                {#if !m.pending && m.built !== false && m.content?.docs?.length}
+                  <div class="mt-5">
+                    <div class="mb-2 flex items-center gap-2 text-[13.5px] faint"><Icon name="report" size={14} />{tr('Na podstawie dokumentów', 'Based on documents')}</div>
+                    <div class="flex flex-wrap gap-2">
+                      {#each m.content.docs as d, i}
+                        <a class="pill pill-sm rise" style="--i:{i}" href={href(`/docs/${d.id}`)} title={d.title}><span class="truncate">{d.title}</span><Icon name="right" size={12} /></a>
+                      {/each}
+                    </div>
+                  </div>
                 {/if}
                 {#if !m.pending && m.built !== false && m.content?.sources?.length}
                   <div class="mt-5">

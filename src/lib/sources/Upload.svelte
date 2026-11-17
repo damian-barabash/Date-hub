@@ -180,7 +180,7 @@
       </div>
       {#if !doneInfo.directory}
         <button class="pill" onclick={() => go('/explore')}><Icon name="compass" size={15} />{t('nav.explore')}</button>
-        <button class="pill pill-accent" onclick={() => go('/')}><Icon name="grid" size={15} />{t('nav.overview')}</button>
+        <button class="pill pill-accent" onclick={() => go('/sales')}><Icon name="grid" size={15} />{t('nav.overview')}</button>
       {:else}
         <button class="pill pill-accent" onclick={() => go('/map')}><Icon name="map" size={15} />{t('nav.map')}</button>
       {/if}

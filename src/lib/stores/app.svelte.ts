@@ -1,6 +1,7 @@
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../supabase';
 import type { Column, Role } from '../data/infer';
+import { loadDocStats } from '../docs/store.svelte';
 
 export interface Dataset {
   id: string;
@@ -67,7 +68,7 @@ export async function boot() {
 }
 
 export async function loadAll() {
-  await Promise.all([loadDatasets(), loadChats(), loadLocations()]);
+  await Promise.all([loadDatasets(), loadChats(), loadLocations(), loadDocStats()]);
 }
 
 export async function logout() {

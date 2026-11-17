@@ -32,6 +32,11 @@
   const regions = $derived(new Set(app.locations.map((l) => l.region).filter(Boolean)).size);
   const cities = $derived(new Set(app.locations.map((l) => l.city).filter(Boolean)).size);
 
+  const dirPoints = $derived(app.locations.filter((l) => l.lat !== null && l.lng !== null).map((l) => ({
+    code: l.code, lat: l.lat!, lng: l.lng!, title: l.name?.replace(/\s+/g, ' ') || l.code, subtitle: [l.code, [l.street, l.city].filter(Boolean).join(', ')].filter(Boolean).join(' · '), size: 1,
+    rows: ([[tr('Województwo', 'Region'), l.region], [tr('Oddział', 'Branch'), l.branch], [tr('Rodzaj', 'Type'), l.kind], ['E-mail', l.email]] as [string, string | null][]).filter((x) => x[1]) as [string, string][],
+    approx: l.status === 'approx',
+  })));
   let geocoding = $state(false);
   let geoInfo = $state('');
   async function geocode() {
@@ -44,8 +49,16 @@
   }
 </script>
 
-{#if !ds}<Empty />
-{:else if !R?.has('location')}<Empty role="location / magazyn / sklep" />
+{#if !ds || !R?.has('location')}
+  <PageHeader title={t('map.title')} sub={tr('Punkty ze słownika lokalizacji', 'Points from the location directory')} />
+  <div class="kpis">
+    <Kpi i={0} label={t('kpi.locations')} value={dirPoints.length || null} format="int" compact={false} icon="store" group="locations" />
+    <Kpi i={1} label={t('kpi.cities')} value={cities || null} format="int" compact={false} icon="pin" group="locations" />
+    <Kpi i={2} label={t('kpi.regions')} value={regions || null} format="int" compact={false} icon="map" group="managers" />
+  </div>
+  <Panel class="mt-4" title={tr('Interaktywna mapa', 'Interactive map')} sub={tr('Kliknij punkt, aby zobaczyć adres', 'Click a point to see the address')} icon="map" group="locations" i={1}>
+    <MapView points={dirPoints} height="min(68vh, 720px)" colorScale="group" />
+  </Panel>
 {:else}
   <PageHeader title={t('map.title')} sub={t('map.sub')}>
     {#if missing}

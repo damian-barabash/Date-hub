@@ -10,7 +10,9 @@
 
   // ленивые страницы — каждая в своём чанке
   const pages: [RegExp, () => Promise<any>][] = [
-    [/^\/$/, () => import('./pages/Overview.svelte')],
+    [/^\/$/, () => import('./pages/Docs.svelte')],
+    [/^\/docs(\/.*)?$/, () => import('./pages/Docs.svelte')],
+    [/^\/sales$/, () => import('./pages/Overview.svelte')],
     [/^\/trends$/, () => import('./pages/Trends.svelte')],
     [/^\/chat(\/[\w-]+)?$/, () => import('./pages/Chat.svelte')],
     [/^\/managers\/compare$/, () => import('./pages/ManagersCompare.svelte')],

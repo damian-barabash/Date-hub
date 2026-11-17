@@ -5,6 +5,8 @@ export type AiEvent =
   | { event: 'chat'; data: { chat_id: string } }
   | { event: 'query'; data: { id: string; purpose: string; sql: string } }
   | { event: 'result'; data: { id: string; rows: number; error?: string } }
+  | { event: 'docs'; data: { id: string; kind: 'search' | 'open'; q: string } }
+  | { event: 'docsresult'; data: { id: string; rows?: number; error?: string } }
   | { event: 'web'; data: { id: string; kind: 'search' | 'page'; q: string } }
   | { event: 'webresult'; data: { id: string; error?: string } }
   | { event: 'final'; data: any }

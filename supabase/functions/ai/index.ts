@@ -22,9 +22,22 @@ Step 1 — if you need data, reply: {"queries":[{"id":"q1","sql":"SELECT ...","p
   - up to 4 queries per step; ids q1,q2,... unique within the conversation turn.
   - The server runs them and returns compact CSV results. You may then request more queries or answer.
   - Internet (only when WEB ACCESS is "on" in DATA CONTEXT): add "web":[{"id":"w1","search":"query"},{"id":"w2","url":"https://…"}] — up to 3 per step, may be combined with "queries".
-    "search" returns titles, links and snippets; "url" returns the page text or JSON of an open API (truncated). Typical flow: search → open 1–2 best links → answer.
-Step 2 — final answer: {"title":"max 5 words","text":"markdown","blocks":[...],"suggestions":["…","…","…"],"sources":[{"title":"…","url":"https://…"}]}
+  - Company documents (invoices, orders, contracts, audit materials, reports, presentations — see DOCUMENTS in DATA CONTEXT): add "docs":[{"id":"d1","search":"keywords in Polish","category":"optional exact category"},{"id":"d2","open":"D3","part":0}] — up to 4 per step.
+    "search" finds the best text fragments (each tagged with a document ref like D3, title, type, date); "open" returns the full text of that document in parts of ~9000 characters (part 0,1,2…). Search with several different keyword sets if the first one misses; open a document before quoting exact figures from it.
+    "search" (web) returns titles, links and snippets; "url" returns the page text or JSON of an open API (truncated). Typical flow: search → open 1–2 best links → answer.
+Step 2 — final answer: {"title":"max 5 words","text":"markdown","blocks":[...],"suggestions":["…","…","…"],"sources":[{"title":"…","url":"https://…"}],"docs":["D3","D7"]}  ("docs" = refs of the company documents the answer is based on)
 If no data is needed (greeting, general question) answer immediately with the final format.
+
+## Always show something
+- Every answer must contain at least one visual block built from real data: a chart when there are numbers to compare or a time axis, otherwise a table (documents found, amounts, dates, parties) or kpis. Document answers: a table of the relevant documents/positions is the minimum; add a chart whenever amounts repeat over months, counterparties or categories.
+- Only for trivial exchanges (greeting, thanks, yes/no, one fact, a question about how the app works) answer in one or two sentences with no blocks.
+- Facts read from document text that you want to show go inline: {"type":"table","title":"…","data":[{"dokument":"…","data":"2026-07-31","kwota_netto":12000},…]} or a chart with "data" (≤ 60 rows). Numbers must be copied exactly from the documents; never estimate.
+
+## Name your documents
+- Whenever you state something taken from a company document, name that document in the text by its title, e.g. „wg dokumentu **Umowa ramowa GW 2025.pdf** (umowa, 21.07.2025)…”. Never write "in the documents" or "according to the files" without the title.
+- Tables built from documents must have a column "dokument" with the title (and "data" when known), so every row can be traced.
+- If two documents disagree, show both titles and both values.
+- List every document you relied on in "docs" (their refs, e.g. ["D2","D5"]).
 
 ## Act first, never refuse first
 - Never answer "I don't know", "I have no data" or "I have no access" before trying. Order: 1) SQL on the database, 2) web search / open APIs, 3) combine. Only after real attempts explain concretely what you tried and what exactly is missing — and still give the best partial result plus the next step.
@@ -137,6 +150,17 @@ function datasetCard(d: Record<string, any>, locCount: number, others: Record<st
   return lines.join('\n');
 }
 
+function docsCard(stats: any): string {
+  if (!stats?.total) return 'DOCUMENTS: none uploaded.';
+  const L: string[] = [];
+  L.push(`DOCUMENTS: ${stats.total} company documents (text only), dates ${stats.min_date ?? '?'} … ${stats.max_date ?? '?'}.`);
+  L.push(`Categories: ${(stats.cats ?? []).map((c: any) => `${c.category} (${c.n})`).join('; ')}`);
+  L.push(`Types: ${(stats.types ?? []).map((c: any) => `${c.doc_type} (${c.n})`).join('; ')}`);
+  L.push('SQL table public.documents(id, title, path [source folder], category, doc_type, summary, doc_date, counterparty, number, net, vat, gross, currency, pages, chars) — one row per document; use it for counts, sums by month (date_trunc(\'month\', doc_date)), by counterparty, by type, lists. Text content is NOT in SQL: use "docs" search/open for it.');
+  L.push('MONEY RULE: for any sum of money over time, by counterparty or in total use the view public.invoices(id, title, doc_type, doc_date, counterparty, party [normalised company name — group by this], number, net, vat, gross, currency) — invoices only, de-duplicated (the same invoice is stored in several folders). NEVER sum documents.gross across documents: summaries (zestawienie), budgets and reports repeat totals of other documents. A single document amount (one order, one budget, one report) may be quoted with its title. Advance invoices (doc_type = \'faktura zaliczkowa\') and the final invoice for the same order can cover the same money: when totalling, show \'faktura\' and \'faktura zaliczkowa\' as separate figures and say that they may overlap. Keep the number of SQL queries small (aim for ≤ 4 per answer).');
+  return L.join('\n');
+}
+
 const webCsv = (w: WebResult) => (w.error ? `ERROR: ${w.error}` : w.text || '(empty)');
 
 function briefAssistant(c: any): string {
@@ -173,6 +197,7 @@ Deno.serve(async (req) => {
       ]);
       const s: Settings = { model: 'deepseek-chat', temperature: 0.3, history_turns: 6, rows_to_model: 40, rows_to_client: 500, cache: true, cache_ttl_hours: 24, max_rounds: 3, web: true, ...(st?.value ?? {}) };
       const dataset = dsRes.data;
+      const { data: docStats } = await db.rpc('doc_stats');
       const { data: others } = await db.from('datasets').select('id, table_name, roles, meta, row_count').eq('status', 'ready').order('created_at');
 
       // чат
@@ -214,7 +239,7 @@ Deno.serve(async (req) => {
       const msgs: { role: string; content: string }[] = [
         { role: 'system', content: SYSTEM },
         { role: 'system', content: `WEB ACCESS: ${s.web ? 'on' : 'off (do not request "web"; say that internet access is disabled in settings if it is needed)'}. Today: ${new Date().toISOString().slice(0, 10)}.` },
-        { role: 'system', content: dataset ? datasetCard(dataset, locCount ?? 0, others ?? []) : 'DATA CONTEXT: no dataset loaded yet. Tell the user to upload data in "Źródła danych".' },
+        { role: 'system', content: `DATA CONTEXT\n${docsCard(docStats)}\n\n${dataset ? datasetCard(dataset, locCount ?? 0, others ?? []).replace(/^DATA CONTEXT\n/, 'SALES TABLE\n') : `SALES TABLE: none loaded. Lookup table public.locations(code, name, city, street, postal, region, branch, kind, email, lat, lng) — ${locCount ?? 0} shops.`}` },
         ...history,
         { role: 'user', content: `${message}\n\n(lang=${lang})` },
       ];
@@ -222,7 +247,9 @@ Deno.serve(async (req) => {
       const results: Record<string, Result> = {};
       const webLog: { id: string; kind: string; q: string; url: string; title: string; error?: string }[] = [];
       let final: any = null; let nudged = false;
-      const rounds = s.max_rounds + (s.web ? 2 : 0);
+      const docLog: { id: string; kind: string; q: string }[] = [];
+      const idToRef = new Map<string, string>(); const refToId = new Map<string, string>(); const idToTitle = new Map<string, string>(); const usedDocs = new Set<string>();
+      const rounds = s.max_rounds + (s.web ? 2 : 0) + (docStats?.total ? 2 : 0);
       for (let round = 0; round <= rounds; round++) {
         await send('status', { step: round === 0 ? 'thinking' : 'analysing', round });
         const r = await deepseek(msgs, { model: s.model, temperature: s.temperature, json: true, max_tokens: 3000 });
@@ -231,17 +258,18 @@ Deno.serve(async (req) => {
         usage.completion += r.usage.completion_tokens ?? 0;
         const obj = parseJson<any>(r.content);
         if (!obj) { final = { text: r.content.slice(0, 3000), blocks: [], suggestions: [] }; break; }
-        const queries: Query[] = dataset && Array.isArray(obj.queries) ? obj.queries.slice(0, 4) : [];
+        const queries: Query[] = (dataset || docStats?.total) && Array.isArray(obj.queries) ? obj.queries.slice(0, 4) : [];
+        const dreq: { id?: string; search?: string; category?: string; open?: string; part?: number }[] = docStats?.total && Array.isArray(obj.docs) && obj.docs.some((x: any) => x && typeof x === 'object') ? obj.docs.filter((x: any) => x && typeof x === 'object').slice(0, 4) : [];
         const web: { id?: string; search?: string; url?: string }[] = s.web && webLog.length < 8 && Array.isArray(obj.web) ? obj.web.slice(0, 3) : [];
-        if (!queries.length && !web.length && round === 0 && s.web && !nudged && message.length > 24) {
+        if (!queries.length && !web.length && !dreq.length && round === 0 && !nudged && message.length > 24) {
           nudged = true;
           msgs.push({ role: 'assistant', content: r.content.slice(0, 1500) });
           msgs.push({ role: 'user', content: 'You answered without checking anything. If any part of this depends on facts outside the conversation (database numbers or the outside world), request "queries" and/or "web" NOW and verify; list sources. If it truly needs no data (small talk, how-to about this app), repeat your final json.' });
           continue;
         }
-        if ((!queries.length && !web.length) || round === rounds) { final = obj; break; }
+        if ((!queries.length && !web.length && !dreq.length) || round === rounds) { final = obj; break; }
 
-        msgs.push({ role: 'assistant', content: JSON.stringify({ ...(queries.length ? { queries } : {}), ...(web.length ? { web } : {}) }) });
+        msgs.push({ role: 'assistant', content: JSON.stringify({ ...(queries.length ? { queries } : {}), ...(dreq.length ? { docs: dreq } : {}), ...(web.length ? { web } : {}) }) });
         const parts: string[] = [];
         for (const q of queries) {
           const id = String(q.id || `q${Object.keys(results).length + 1}`).replace(/[^\w]/g, '').slice(0, 10);
@@ -252,6 +280,32 @@ Deno.serve(async (req) => {
           results[id] = res;
           await send('result', { id, rows: rows.length, error: res.error });
           parts.push(`### ${id}${q.purpose ? ` (${q.purpose})` : ''} — ${rows.length} rows\n${toCsv(res, s.rows_to_model)}`);
+        }
+        // документы компании: поиск по тексту и чтение
+        for (const dq of dreq) {
+          const id = String(dq.id || `d${docLog.length + 1}`).replace(/[^\w]/g, '').slice(0, 10);
+          if (dq.open) {
+            const docId = refToId.get(String(dq.open).toUpperCase());
+            await send('docs', { id, kind: 'open', q: docId ? idToTitle.get(docId) ?? String(dq.open) : String(dq.open) });
+            if (!docId) { parts.push(`### ${id} — open ${dq.open}\nERROR: unknown document ref (use a ref from a search result)`); await send('docsresult', { id, error: 'unknown ref' }); continue; }
+            const part = Math.max(0, Number(dq.part) || 0);
+            const { data: tx } = await db.rpc('doc_text', { p_id: docId, p_from: part * 5, p_count: 5 });
+            usedDocs.add(docId); docLog.push({ id, kind: 'open', q: String(dq.open) });
+            parts.push(`### ${id} — document ${String(dq.open).toUpperCase()} "${idToTitle.get(docId)}", part ${part} of ${Math.ceil((tx?.chunks ?? 0) / 5)}\n${String(tx?.text ?? '(empty)').slice(0, 9500)}`);
+            await send('docsresult', { id });
+          } else {
+            const qtext = String(dq.search ?? '').slice(0, 200);
+            await send('docs', { id, kind: 'search', q: qtext });
+            const { data: hits } = await db.rpc('doc_search', { p_q: qtext, p_limit: 8, p_category: dq.category ?? null });
+            const rows = (hits ?? []) as any[];
+            docLog.push({ id, kind: 'search', q: qtext });
+            const out = rows.map((h) => {
+              if (!idToRef.has(h.id)) { const ref = `D${idToRef.size + 1}`; idToRef.set(h.id, ref); refToId.set(ref, h.id); idToTitle.set(h.id, h.title); }
+              return `[${idToRef.get(h.id)}] ${h.title} — ${h.doc_type ?? 'dokument'}${h.doc_date ? `, ${h.doc_date}` : ''}, ${h.category ?? ''} (${h.path})\n${String(h.content).replace(/\s+/g, ' ').slice(0, 700)}`;
+            });
+            parts.push(`### ${id} — documents search "${qtext}" — ${rows.length} fragments\n${out.join('\n\n') || '(nothing found — try other keywords or SQL on public.documents)'}`);
+            await send('docsresult', { id, rows: rows.length });
+          }
         }
         // интернет: поиск и чтение идут параллельно
         const fetched = await Promise.all(web.map(async (w, i) => {
@@ -292,6 +346,7 @@ Deno.serve(async (req) => {
         blocks: blocks.filter((b: any) => !b.q || out[b.q]).map((b: any) => (Array.isArray(b.data) ? { ...b, data: b.data.slice(0, 120) } : b)),
         sources: (Array.isArray(final?.sources) ? final.sources : []).filter((x: any) => x && /^https?:\/\//.test(String(x.url ?? ''))).slice(0, 8).map((x: any) => ({ title: String(x.title ?? x.url).slice(0, 140), url: String(x.url) })),
         web: webLog,
+        docs: [...new Set([...(Array.isArray(final?.docs) ? final.docs : []).map((r: any) => refToId.get(String(r).toUpperCase())).filter(Boolean) as string[], ...usedDocs])].slice(0, 12).map((id) => ({ id, title: idToTitle.get(id) ?? '' })),
         suggestions: (Array.isArray(final?.suggestions) ? final.suggestions : []).slice(0, 3).map(String),
         results: out,
         queries: Object.entries(results).map(([id, r]) => ({ id, sql: r.sql, purpose: r.purpose, rows: r.rows.length, error: r.error })),
@@ -303,7 +358,7 @@ Deno.serve(async (req) => {
       if (!history.length && content.title) upd.title = content.title;
       await db.from('chats').update(upd).eq('id', chatId);
       await db.from('ai_usage').insert({ user_id: user.id, model: s.model, ...u });
-      if (s.cache && !history.length && content.text && !webLog.length && !content.queries.some((q) => q.error)) {
+      if (s.cache && !history.length && content.text && !webLog.length && !docLog.length && !content.queries.some((q) => q.error)) {
         await db.from('ai_cache').upsert({ hash: cacheKey, answer: content, hits: 0, created_at: new Date().toISOString() });
       }
       await send('final', { ...content, id: saved?.id, chat_id: chatId, usage: u });

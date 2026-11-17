@@ -1,7 +1,9 @@
 <script lang="ts">
   import { slide, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { app, loadChats, logout, toast } from '../stores/app.svelte';
+  import { active, app, loadChats, logout, toast } from '../stores/app.svelte';
+  import { docs, catHref } from '../docs/store.svelte';
+  import { tr } from '../i18n.svelte';
   import { route, href, go } from '../router.svelte';
   import { t, type Key } from '../i18n.svelte';
   import { supabase } from '../supabase';
@@ -18,22 +20,38 @@
   }
 
   type Item = { key: Key; path: string; icon: string; group: string; children?: { key: Key; path: string }[] };
-  const analytics: Item[] = [
-    { key: 'nav.overview', path: '/', icon: 'grid', group: 'ai' },
-    { key: 'nav.trends', path: '/trends', icon: 'trendUp', group: 'finance' },
-    { key: 'nav.managers', path: '/managers', icon: 'users', group: 'managers', children: [
-      { key: 'nav.managers.all', path: '/managers' }, { key: 'nav.managers.compare', path: '/managers/compare' } ] },
-    { key: 'nav.locations', path: '/locations', icon: 'store', group: 'locations', children: [
-      { key: 'nav.locations.all', path: '/locations' }, { key: 'nav.locations.region', path: '/locations/region' }, { key: 'nav.map', path: '/map' } ] },
-    { key: 'nav.products', path: '/products', icon: 'box', group: 'products' },
-    { key: 'nav.finance', path: '/finance', icon: 'wallet', group: 'finance', children: [
-      { key: 'nav.finance.revenue', path: '/finance' }, { key: 'nav.finance.margin', path: '/finance/margin' }, { key: 'nav.finance.prices', path: '/finance/prices' } ] },
-    { key: 'nav.reports', path: '/reports', icon: 'report', group: 'ai' },
-    { key: 'nav.explore', path: '/explore', icon: 'compass', group: 'ai' },
-  ];
+  const MAX_TABS = 15; // потолок вкладок меню вместе с динамическими
+
+  // Аналитика продаж появляется только когда есть таблица с нужными колонками
+  const analytics = $derived.by((): Item[] => {
+    const d = active(); const r = d?.roles ?? {};
+    const out: Item[] = [];
+    if (d) {
+      out.push({ key: 'nav.overview', path: '/sales', icon: 'grid', group: 'ai' });
+      out.push({ key: 'nav.trends', path: '/trends', icon: 'trendUp', group: 'finance' });
+      if (r.manager) out.push({ key: 'nav.managers', path: '/managers', icon: 'users', group: 'managers', children: [
+        { key: 'nav.managers.all', path: '/managers' }, { key: 'nav.managers.compare', path: '/managers/compare' }] });
+      if (r.location) out.push({ key: 'nav.locations', path: '/locations', icon: 'store', group: 'locations', children: [
+        { key: 'nav.locations.all', path: '/locations' }, { key: 'nav.locations.region', path: '/locations/region' }] });
+      if (r.product || r.product_id) out.push({ key: 'nav.products', path: '/products', icon: 'box', group: 'products' });
+      if (r.net || r.gross) out.push({ key: 'nav.finance', path: '/finance', icon: 'wallet', group: 'finance', children: [
+        { key: 'nav.finance.revenue', path: '/finance' }, ...(r.margin ? [{ key: 'nav.finance.margin' as Key, path: '/finance/margin' }] : []), ...(r.price ? [{ key: 'nav.finance.prices' as Key, path: '/finance/prices' }] : [])] });
+      out.push({ key: 'nav.explore', path: '/explore', icon: 'compass', group: 'ai' });
+    }
+    return out;
+  });
+  const hasMap = $derived(app.locations.some((l) => l.lat !== null));
+  // Вкладки документов: категории, которые ИИ вывел из загруженного (самые большие первыми)
+  const docTabs = $derived.by(() => {
+    const fixed = 2 /* asystent, dokumenty */ + analytics.length + (hasMap ? 1 : 0) + 3 /* raporty, źródła, ustawienia */;
+    return (docs.stats?.cats ?? []).filter((c) => c.category && c.category !== '—').slice(0, Math.max(0, MAX_TABS - fixed));
+  });
+  const CAT_ICONS: [RegExp, string][] = [[/faktur|rozlicz|płatn|platn|finans/i, 'wallet'], [/zamówi|zamowi/i, 'box'], [/umow|porozum|prawn/i, 'bookmark'], [/audyt|kontrol/i, 'search'], [/kampani|marketing|promoc/i, 'bolt'],
+    [/budżet|budzet|koszt/i, 'coins'], [/raport|analiz|wynik/i, 'report'], [/prezent|ofert/i, 'layers'], [/sklep|punkt|mystery/i, 'store'], [/program|lojaln|klub|club/i, 'users'], [/techn|system|platform|it\b/i, 'code'], [/korespond|mail/i, 'chat']];
+  const catIcon = (c: string) => CAT_ICONS.find(([re]) => re.test(c))?.[1] ?? 'report';
 
   const isOn = (p: string) => (p === '/' ? route.path === '/' : route.path === p || route.path.startsWith(p + '/'));
-  const groupOn = (it: Item) => isOn(it.path) || !!it.children?.some((c) => isOn(c.path)) || (it.path === '/locations' && route.path === '/map');
+  const groupOn = (it: Item) => isOn(it.path) || !!it.children?.some((c) => isOn(c.path));
   let open = $state<Record<string, boolean>>({});
   let chatsOpen = $state(true);
 
@@ -83,7 +101,17 @@
   <nav class="flex-1 overflow-y-auto px-3 pb-4">
     <a href={href('/chat')} class="nav-item" class:active={route.path.startsWith('/chat')}><Icon name="ask" size={17} /><span>{t('nav.chat')}</span></a>
 
-    <div class="mt-5 mb-2 px-3 text-[13px] font-medium faint">{t('nav.analytics')}</div>
+    <a href={href('/')} class="nav-item" class:active={route.path === '/' || route.path === '/docs'}><Icon name="grid" size={17} /><span>{tr('Dokumenty', 'Documents')}</span>
+      {#if docs.stats?.total}<span class="ml-auto text-[12.5px] faint">{docs.stats.total}</span>{/if}</a>
+    {#if docTabs.length}
+      <div class="mt-5 mb-2 px-3 text-[13px] font-medium faint">{tr('Zakładki', 'Tabs')}</div>
+      {#each docTabs as c (c.category)}
+        <a href={href(catHref(c.category))} class="nav-item" class:active={decodeURIComponent(route.path) === `/docs/c/${c.category}`} transition:slide={{ duration: 260 }}>
+          <Icon name={catIcon(c.category)} size={17} /><span class="truncate">{c.category}</span><span class="ml-auto shrink-0 text-[12.5px] faint">{c.n}</span>
+        </a>
+      {/each}
+    {/if}
+    {#if analytics.length || hasMap}<div class="mt-5 mb-2 px-3 text-[13px] font-medium faint">{t('nav.analytics')}</div>{/if}
     {#each analytics as it (it.key)}
       {@const on = groupOn(it)}
       {@const expanded = open[it.key] ?? on}
@@ -105,6 +133,9 @@
         {/if}
       </div>
     {/each}
+
+    {#if hasMap}<a href={href('/map')} class="nav-item" class:active={isOn('/map')}><Icon name="map" size={17} /><span>{t('nav.map')}</span></a>{/if}
+    <a href={href('/reports')} class="nav-item" class:active={isOn('/reports')}><Icon name="report" size={17} /><span>{t('nav.reports')}</span></a>
 
     <div class="mt-6 mb-2 flex items-center justify-between px-3">
       <button class="flex h-8 items-center gap-1.5 text-[13px] font-medium faint hover:text-white" onclick={() => (chatsOpen = !chatsOpen)}>
