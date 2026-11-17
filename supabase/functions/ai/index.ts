@@ -174,7 +174,16 @@ Deno.serve(async (req) => {
   if (!user) return json({ error: 'unauthorized' }, 401);
 
   const body = await req.json().catch(() => ({}));
-  const message: string = String(body.message ?? '').trim().slice(0, 4000);
+  // режим «дашборд вкладки»: задание формируется на сервере, результат сохраняется в public.dashboards
+  const dash: string | null = typeof body.dashboard === 'string' && body.dashboard.trim() ? body.dashboard.trim().slice(0, 60) : null;
+  const message: string = dash
+    ? `Zbuduj dashboard zakładki „${dash}” — wyłącznie z danych tej grupy dokumentów (public.documents WHERE category = '${dash.replace(/'/g, "''")}').
+Krok 1: rozpoznaj, co naprawdę jest w tej grupie — SQL: rodzaje dokumentów, zakres dat, kontrahenci, najczęstsze tematy (jsonb_array_elements_text(meta->'topics')), dokumenty z kwotami.
+Krok 2: znajdź i otwórz 3–6 najważniejszych dokumentów tej grupy i wyciągnij z ich TREŚCI dane charakterystyczne właśnie dla niej (np. budżet → pozycje i kwoty, plan vs realizacja; audyt → ustalenia, kwoty sporne, statusy pytań; kampanie → harmonogram, zasięgi, koszty, KPI; umowy → strony, terminy, wartości, kary; zamówienia → numery, etapy, statusy; platforma/IT → moduły, SLA, zgłoszenia; spotkania → decyzje i zadania).
+Krok 3: zwróć 6–9 bloków dobranych do tych danych: kpis z liczbami specyficznymi dla tej grupy, 3–5 wykresów różnych typów (dobierz typ do danych: oś czasu → line/area, struktura → treemap/donut, ranking → bar poziomy, plan vs wykonanie → bar grupowany, etapy → funnel/waterfall), 1–2 tabele z konkretami i callout z tym, co wymaga uwagi.
+Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów” — użyj takiego wykresu najwyżej raz i tylko jeśli nic lepszego nie wynika z danych. Każda liczba musi pochodzić z SQL albo z otwartego dokumentu; w tabelach kolumna „dokument”.
+„text”: 2–3 zdania — co zawiera ta zakładka i najważniejszy wniosek.`
+    : String(body.message ?? '').trim().slice(0, 4000);
   if (!message) return json({ error: 'empty message' }, 400);
   const lang: string = body.lang === 'en' ? 'en' : 'pl';
   const db = admin();
@@ -249,10 +258,10 @@ Deno.serve(async (req) => {
       let final: any = null; let nudged = false;
       const docLog: { id: string; kind: string; q: string }[] = [];
       const idToRef = new Map<string, string>(); const refToId = new Map<string, string>(); const idToTitle = new Map<string, string>(); const usedDocs = new Set<string>();
-      const rounds = s.max_rounds + (s.web ? 2 : 0) + (docStats?.total ? 2 : 0);
+      const rounds = dash ? 7 : s.max_rounds + (s.web ? 2 : 0) + (docStats?.total ? 2 : 0);
       for (let round = 0; round <= rounds; round++) {
         await send('status', { step: round === 0 ? 'thinking' : 'analysing', round });
-        const r = await deepseek(msgs, { model: s.model, temperature: s.temperature, json: true, max_tokens: 3000 });
+        const r = await deepseek(msgs, { model: s.model, temperature: s.temperature, json: true, max_tokens: dash ? 5000 : 3000 });
         usage.prompt += r.usage.prompt_tokens ?? 0;
         usage.hit += r.usage.prompt_cache_hit_tokens ?? 0;
         usage.completion += r.usage.completion_tokens ?? 0;
@@ -260,7 +269,7 @@ Deno.serve(async (req) => {
         if (!obj) { final = { text: r.content.slice(0, 3000), blocks: [], suggestions: [] }; break; }
         const queries: Query[] = (dataset || docStats?.total) && Array.isArray(obj.queries) ? obj.queries.slice(0, 4) : [];
         const dreq: { id?: string; search?: string; category?: string; open?: string; part?: number }[] = docStats?.total && Array.isArray(obj.docs) && obj.docs.some((x: any) => x && typeof x === 'object') ? obj.docs.filter((x: any) => x && typeof x === 'object').slice(0, 4) : [];
-        const web: { id?: string; search?: string; url?: string }[] = s.web && webLog.length < 8 && Array.isArray(obj.web) ? obj.web.slice(0, 3) : [];
+        const web: { id?: string; search?: string; url?: string }[] = s.web && !dash && webLog.length < 8 && Array.isArray(obj.web) ? obj.web.slice(0, 3) : [];
         if (!queries.length && !web.length && !dreq.length && round === 0 && !nudged && message.length > 24) {
           nudged = true;
           msgs.push({ role: 'assistant', content: r.content.slice(0, 1500) });
@@ -337,6 +346,7 @@ Deno.serve(async (req) => {
 
       await send('status', { step: 'visualising' });
       const blocks = (Array.isArray(final?.blocks) ? final.blocks : []).filter((b: any) => b && typeof b === 'object').slice(0, 12);
+      if (dash) for (const b of blocks) if (b.q && results[b.q] && !results[b.q].error) results[b.q].rows = results[b.q].rows.slice(0, 200);
       const used = new Set(blocks.map((b: any) => b.q).filter(Boolean));
       const out: Record<string, { columns: string[]; rows: Record<string, unknown>[] }> = {};
       for (const id of used) if (results[id as string] && !results[id as string].error) out[id as string] = { columns: results[id as string].columns, rows: results[id as string].rows };
@@ -353,6 +363,14 @@ Deno.serve(async (req) => {
         dataset_id: dataset?.id ?? null,
       };
       const u = { prompt_tokens: usage.prompt, cache_hit_tokens: usage.hit, completion_tokens: usage.completion };
+      if (dash) {
+        const { count: n } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('category', dash);
+        if (content.blocks.length) await db.from('dashboards').upsert({ category: dash, content, doc_count: n ?? 0, updated_at: new Date().toISOString() });
+        await db.from('chats').delete().eq('id', chatId);
+        await db.from('ai_usage').insert({ user_id: user.id, model: s.model, ...u });
+        await send('final', { ...content, usage: u, doc_count: n ?? 0 });
+        return;
+      }
       const { data: saved } = await db.from('messages').insert({ chat_id: chatId, role: 'assistant', content, usage: u }).select('id').single();
       const upd: Record<string, unknown> = { updated_at: new Date().toISOString() };
       if (!history.length && content.title) upd.title = content.title;

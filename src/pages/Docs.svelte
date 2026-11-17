@@ -13,6 +13,9 @@
   import Panel from '../lib/ui/Panel.svelte';
   import Icon from '../lib/ui/Icon.svelte';
   import Chart from '../lib/charts/Chart.svelte';
+  import Blocks from '../lib/chat/Blocks.svelte';
+  import Markdown from '../lib/chat/Markdown.svelte';
+  import { askAI } from '../lib/chat/sse';
 
   const docId = $derived(route.parts[0] === 'docs' && route.parts[1] && route.parts[1] !== 'c' ? route.parts[1] : null);
   const category = $derived(route.parts[1] === 'c' && route.parts[2] ? decodeURIComponent(route.parts[2]) : null);
@@ -46,6 +49,40 @@
     return () => { alive = false; };
   });
   $effect(() => { void category; q = ''; hits = null; fType = ''; page = 0; });
+
+  // ── дашборд вкладки: ИИ строит его из данных самой вкладки (не шаблон); хранится на сервере
+  let dash = $state<{ content: any; doc_count: number; updated_at: string } | null>(null);
+  let dashLoaded = $state(false);
+  let building = $state(false);
+  let buildSteps = $state<string[]>([]);
+  let buildErr = $state('');
+  const tried = new Set<string>();
+  $effect(() => {
+    const c = category; dash = null; dashLoaded = false; buildErr = '';
+    if (!c) return;
+    let alive = true;
+    supabase.from('dashboards').select('content, doc_count, updated_at').eq('category', c).maybeSingle().then(({ data }) => {
+      if (!alive) return;
+      dash = (data ?? null) as typeof dash; dashLoaded = true;
+      if (!data && !tried.has(c) && !building) { tried.add(c); void buildDash(c); } // новая вкладка — собираем при первом открытии
+    });
+    return () => { alive = false; };
+  });
+  async function buildDash(c: string) {
+    if (building) return;
+    building = true; buildErr = ''; buildSteps = [tr('Rozpoznaję, co jest w tej zakładce', 'Working out what this tab contains')];
+    try {
+      await askAI({ message: '', dashboard: c, lang: i18n.lang }, (e) => {
+        if (e.event === 'query') buildSteps = [...buildSteps, `${tr('Liczę', 'Computing')}: ${e.data.purpose || e.data.id}`];
+        else if (e.event === 'docs') buildSteps = [...buildSteps, `${e.data.kind === 'open' ? tr('Czytam', 'Reading') : tr('Szukam', 'Searching')}: ${e.data.q}`];
+        else if (e.event === 'status' && e.data.step === 'visualising') buildSteps = [...buildSteps, tr('Układam wykresy', 'Arranging charts')];
+        else if (e.event === 'final') { if (category === c && e.data.blocks?.length) dash = { content: e.data, doc_count: e.data.doc_count ?? 0, updated_at: new Date().toISOString() }; else if (!e.data.blocks?.length) buildErr = tr('Nie udało się zbudować dashboardu z tych danych', 'Could not build a dashboard from this data'); }
+        else if (e.event === 'error') buildErr = e.data.message;
+      });
+    } catch (e) { buildErr = e instanceof Error ? e.message : String(e); }
+    building = false;
+  }
+  const stale = $derived(!!dash && !!category && !loading && dash.doc_count !== list.length);
 
   // ── один документ
   let doc = $state<Doc | null>(null);
@@ -176,7 +213,25 @@
     {/if}
   </div>
 
-  {#if !hits}
+  {#if category && !hits}
+    {#if building}
+      <div class="card card-pad rise mt-4">
+        <div class="flex items-center gap-3 text-[16px] font-semibold"><span class="spin inline-block h-4 w-4 rounded-full border-2 border-white/20 border-t-white"></span>{tr('Buduję dashboard z danych tej zakładki', 'Building the dashboard from this tab’s data')}</div>
+        <div class="mt-3 space-y-1.5">{#each buildSteps.slice(-6) as st, i (i + st)}<div class="rise truncate text-[14px] muted">{st}</div>{/each}</div>
+      </div>
+    {:else if dash}
+      {#if dash.content.text}<div class="mt-5 max-w-[980px] rise"><Markdown text={dash.content.text} /></div>{/if}
+      <div class="mt-4"><Blocks blocks={dash.content.blocks ?? []} results={dash.content.results ?? {}} /></div>
+      <div class="mt-4 flex flex-wrap items-center gap-3 text-[13.5px] faint">
+        <span>{tr('Dashboard zbudowany z danych tej zakładki', 'Dashboard built from this tab’s data')} · {new Date(dash.updated_at).toLocaleDateString(i18n.lang === 'en' ? 'en-GB' : 'pl-PL')}</span>
+        {#if stale}<span class="text-[#ffb020]">{tr('dokumenty się zmieniły', 'documents have changed')}</span>{/if}
+        <button class="pill pill-sm" onclick={() => buildDash(category!)}><Icon name="refresh" size={13} />{tr('Zbuduj ponownie', 'Rebuild')}</button>
+      </div>
+    {:else if buildErr}
+      <div class="card card-pad mt-4 flex flex-wrap items-center gap-3 text-[14.5px]" role="alert"><span class="min-w-0 flex-1 text-[#f59a98]">{buildErr}</span><button class="pill pill-sm" onclick={() => buildDash(category!)}><Icon name="refresh" size={13} />{tr('Spróbuj ponownie', 'Try again')}</button></div>
+    {/if}
+  {/if}
+  {#if !hits && (!category || (dashLoaded && !dash && !building))}
     <div class="mt-4 grid gap-4 xl:grid-cols-2">
       {#if byMonth.length > 1}
         <Panel title={money.length ? tr('Faktury w czasie (brutto)', 'Invoices over time (gross)') : tr('Dokumenty w czasie', 'Documents over time')} sub={tr('wg daty dokumentu', 'by document date')} icon="calendar" group="locations" i={3}>

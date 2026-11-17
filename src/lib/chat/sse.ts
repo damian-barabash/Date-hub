@@ -13,7 +13,7 @@ export type AiEvent =
   | { event: 'error'; data: { message: string } };
 
 /** POST в edge function «ai» с чтением SSE-потока шагов. */
-export async function askAI(body: { message: string; chat_id?: string; dataset_id?: string; lang: string }, on: (e: AiEvent) => void, signal?: AbortSignal) {
+export async function askAI(body: { message: string; chat_id?: string; dataset_id?: string; lang: string; dashboard?: string }, on: (e: AiEvent) => void, signal?: AbortSignal) {
   const { data } = await supabase.auth.getSession();
   const res = await fetch(`${SUPABASE_URL}/functions/v1/ai`, {
     method: 'POST',
