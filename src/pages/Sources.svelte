@@ -6,6 +6,7 @@
   import Panel from '../lib/ui/Panel.svelte';
   import Upload from '../lib/sources/Upload.svelte';
   import DocUpload from '../lib/sources/DocUpload.svelte';
+  import KnowledgeBase from '../lib/sources/KnowledgeBase.svelte';
   import { docs } from '../lib/docs/store.svelte';
   import Datasets from '../lib/sources/Datasets.svelte';
   import Connectors from '../lib/sources/Connectors.svelte';
@@ -13,7 +14,7 @@
 
   let tab = $state<'docs' | 'upload' | 'datasets' | 'connectors' | 'locations'>('docs');
   const tabs = $derived([
-    { k: 'docs', l: tr('Dokumenty', 'Documents'), n: docs.stats?.total ?? 0 },
+    { k: 'docs', l: tr('Baza wiedzy', 'Knowledge base'), n: docs.stats?.total ?? 0 },
     { k: 'upload', l: tr('Tabela do analizy', 'Table for analysis'), n: null },
     { k: 'datasets', l: t('src.datasets'), n: app.datasets.length },
     { k: 'connectors', l: t('src.connectors'), n: null },
@@ -31,8 +32,11 @@
 
 {#key tab}
   {#if tab === 'docs'}
-    <Panel title={tr('Dokumenty', 'Documents')} sub={tr('Faktury, zamówienia, umowy, raporty, prezentacje — aplikacja sama ułoży zakładki i wyciągnie dane', 'Invoices, orders, contracts, reports, presentations — the app builds tabs and extracts the data itself')} icon="upload" group="locations">
+    <Panel title={tr('Dodaj dokumenty', 'Add documents')} sub={tr('Faktury, zamówienia, umowy, raporty, prezentacje — aplikacja sama ułoży zakładki i wyciągnie dane', 'Invoices, orders, contracts, reports, presentations — the app builds tabs and extracts the data itself')} icon="upload" group="locations">
       <DocUpload />
+    </Panel>
+    <Panel class="mt-4" title={tr('Dokumenty w bazie wiedzy', 'Documents in the knowledge base')} sub={tr('Każdy dokument można otworzyć lub usunąć — zakładki i wykresy przeliczą się same', 'Every document can be opened or deleted — tabs and charts recalculate themselves')} icon="database" group="ai">
+      <KnowledgeBase />
     </Panel>
   {:else if tab === 'upload'}
     <Panel title={t('src.upload')} sub={tr('Każdy plik staje się tabelą do analizy — system sam rozpoznaje kolumny, typy i role. Słownik punktów (adresy) aktualizuje mapę.', 'Every file becomes an analysable table — the system detects columns, types and roles. A point directory (addresses) updates the map.')} icon="upload" group="locations">

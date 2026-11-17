@@ -101,8 +101,8 @@
   <nav class="flex-1 overflow-y-auto px-3 pb-4">
     <a href={href('/chat')} class="nav-item" class:active={route.path.startsWith('/chat')}><Icon name="ask" size={17} /><span>{t('nav.chat')}</span></a>
 
-    <a href={href('/')} class="nav-item" class:active={route.path === '/' || route.path === '/docs'}><Icon name="grid" size={17} /><span>{tr('Dokumenty', 'Documents')}</span>
-      {#if docs.stats?.total}<span class="ml-auto text-[12.5px] faint">{docs.stats.total}</span>{/if}</a>
+    <a href={href('/')} class="nav-item" class:active={route.path === '/' || route.path === '/docs'}><Icon name="grid" size={17} /><span>{tr('Przegląd', 'Overview')}</span>
+</a>
     {#if docTabs.length}
       <div class="mt-5 mb-2 px-3 text-[13px] font-medium faint">{tr('Zakładki', 'Tabs')}</div>
       {#each docTabs as c (c.category)}

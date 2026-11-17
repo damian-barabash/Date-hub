@@ -31,9 +31,18 @@
     const c = category; void docs.stats?.total; void docs.stats?.pending;
     if (docId) return;
     let alive = true; loading = true;
-    let qy = supabase.from('documents').select('*').order('doc_date', { ascending: false, nullsFirst: false }).limit(3000);
-    if (c) qy = qy.eq('category', c);
-    qy.then(({ data }) => { if (alive) { list = (data ?? []) as Doc[]; loading = false; } });
+    // лёгкие поля, постранично (сервер отдаёт максимум 1000 строк за запрос)
+    (async () => {
+      const out: Doc[] = [];
+      for (let from = 0; from < 20000; from += 1000) {
+        let qy = supabase.from('documents').select('id,title,category,doc_type,summary,doc_date,counterparty,number,net,gross,meta,status').order('doc_date', { ascending: false, nullsFirst: false }).order('id').range(from, from + 999);
+        if (c) qy = qy.eq('category', c);
+        const { data } = await qy;
+        out.push(...((data ?? []) as unknown as Doc[]));
+        if ((data ?? []).length < 1000) break;
+      }
+      if (alive) { list = out; loading = false; }
+    })();
     return () => { alive = false; };
   });
   $effect(() => { void category; q = ''; hits = null; fType = ''; page = 0; });
@@ -59,7 +68,7 @@
     if (!confirm(`${t('common.confirm')} «${d.title}»`)) return;
     const { error } = await supabase.from('documents').delete().eq('id', d.id);
     if (error) return toast(error.message, 'err');
-    await loadDocStats(); history.length > 1 ? history.back() : go('/');
+    await loadDocStats(); toast(tr('Usunięto z bazy wiedzy', 'Deleted from the knowledge base')); history.length > 1 ? history.back() : go('/sources');
   }
 
   // деньги считаем только по счетам и без повторов (один счёт лежит в нескольких папках; сводки и бюджеты повторяют чужие итоги)
@@ -82,6 +91,14 @@
   const byParty = $derived.by(() => { const m = new Map<string, { kontrahent: string; kwota: number; dokumenty: number }>(); for (const d of money) { const k = party(d.counterparty); const a = m.get(k) ?? { kontrahent: k, kwota: 0, dokumenty: 0 }; a.kwota += amt(d); a.dokumenty++; m.set(k, a); } return [...m.values()].sort((a, b) => b.kwota - a.kwota).slice(0, 10); });
   const byCat = $derived((docs.stats?.cats ?? []).map((c) => ({ kategoria: c.category, dokumenty: c.n })));
   const total = $derived(money.reduce((a, d) => a + amt(d), 0));
+  const recent = $derived(list.filter((d) => d.summary && d.doc_date).slice(0, 8));
+  const topInv = $derived([...money].sort((a, b) => amt(b) - amt(a)).slice(0, 6));
+  const topics = $derived.by(() => {
+    const m = new Map<string, number>();
+    for (const d of list) for (const x of d.meta?.topics ?? []) { const k = String(x).toLowerCase().trim(); if (k.length > 2 && k.length < 40) m.set(k, (m.get(k) ?? 0) + 1); }
+    return [...m.entries()].filter(([, n]) => n > 1).sort((a, b) => b[1] - a[1]).slice(0, 18);
+  });
+  const kbHref = $derived(href(`/sources${category ? `?cat=${encodeURIComponent(category)}` : ''}`));
   const adv = $derived(money.filter((d) => /zaliczk/i.test(d.doc_type ?? '')).reduce((a, d) => a + amt(d), 0));
   const filtered = $derived(list.filter((d) => !fType || (d.doc_type ?? '—') === fType).sort((a, b) => {
     const x = a[sort.by], y = b[sort.by]; if (x === y) return 0; if (x === null || x === undefined) return 1; if (y === null || y === undefined) return -1; return (x > y ? 1 : -1) * sort.dir;
@@ -124,7 +141,8 @@
     <a class="pill pill-accent mt-6" href={href('/sources')}><Icon name="upload" size={15} />{t('empty.cta')}</a>
   </div>
 {:else}
-  <PageHeader title={category ?? tr('Dokumenty', 'Documents')} sub={category ? tr('Dokumenty w tej zakładce', 'Documents in this tab') : tr('Wszystko, co zostało wgrane — uporządkowane automatycznie', 'Everything uploaded — organised automatically')}>
+  <PageHeader title={category ?? tr('Przegląd', 'Overview')} sub={category ? tr('Podsumowanie tej zakładki — liczby, wykresy i wyciągi z dokumentów', 'Summary of this tab — figures, charts and excerpts from documents') : tr('Podsumowanie całej bazy wiedzy — liczby, wykresy i wyciągi z dokumentów', 'Summary of the whole knowledge base — figures, charts and excerpts')}>
+    <a class="pill" href={kbHref}><Icon name="database" size={15} />{tr('Baza wiedzy', 'Knowledge base')} · {int(list.length)} {tr('dok.', 'docs')}</a>
     {#if docs.stats?.pending}<span class="pill"><span class="spin inline-block h-3.5 w-3.5 rounded-full border-2 border-white/20 border-t-white"></span>{tr('AI porządkuje', 'AI organising')} · {docs.stats.pending}</span>{/if}
     <button class="pill pill-accent" onclick={() => go(`/chat?q=${encodeURIComponent(category ? tr(`Przygotuj przegląd dokumentów z kategorii „${category}”: co zawierają, kwoty, terminy, na co zwrócić uwagę`, `Prepare an overview of documents in “${category}”: contents, amounts, dates, what to watch`) : tr('Przygotuj przegląd wszystkich dokumentów: kategorie, kwoty w czasie, najważniejsze ustalenia', 'Prepare an overview of all documents: categories, amounts over time, key findings'))}`)}><Icon name="ask" size={15} />{tr('Przegląd AI', 'AI overview')}</button>
   </PageHeader>
@@ -182,40 +200,39 @@
       {/if}
     </div>
 
-    <Panel class="mt-4" title={tr('Lista dokumentów', 'Document list')} sub={String(filtered.length)} icon="report" i={7}>
-      {#snippet actions()}
-        <select class="input !h-9 !w-auto !text-[13.5px]" bind:value={fType}><option value="">{tr('Rodzaj', 'Type')}: {t('common.all')}</option>{#each types as x}<option value={x.type}>{x.type} ({x.n})</option>{/each}</select>
-        <button class="pill pill-sm" onclick={() => csvDownload('dokumenty', filtered.map((d) => ({ tytul: d.title, kategoria: d.category, rodzaj: d.doc_type, data: d.doc_date, kontrahent: d.counterparty, numer: d.number, netto: d.net, brutto: d.gross, folder: d.path })))}><Icon name="download" size={13} />CSV</button>
-      {/snippet}
-      <div class="overflow-x-auto">
-        <table class="table">
-          <thead><tr>
-            <th><button class:on={sort.by === 'title'} onclick={th('title')}>{tr('Dokument', 'Document')}{arrow('title')}</button></th>
-            <th><button class:on={sort.by === 'doc_type'} onclick={th('doc_type')}>{tr('Rodzaj', 'Type')}{arrow('doc_type')}</button></th>
-            <th><button class:on={sort.by === 'doc_date'} onclick={th('doc_date')}>{tr('Data', 'Date')}{arrow('doc_date')}</button></th>
-            <th><button class:on={sort.by === 'counterparty'} onclick={th('counterparty')}>{tr('Kontrahent', 'Counterparty')}{arrow('counterparty')}</button></th>
-            <th class="r"><button class:on={sort.by === 'gross'} onclick={th('gross')}>{tr('Kwota', 'Amount')}{arrow('gross')}</button></th>
-          </tr></thead>
-          <tbody>
-            {#each filtered.slice(page * PER, page * PER + PER) as d, i (d.id)}
-              <tr class="clickable rise" style="--i:{Math.min(i, 12)}" onclick={() => go(`/docs/${d.id}`)}>
-                <td class="max-w-[420px]"><div class="truncate font-semibold">{d.title}</div><div class="truncate text-[13px] faint">{d.status === 'new' ? tr('w kolejce do uporządkowania…', 'waiting to be organised…') : (d.summary ?? d.path)}</div></td>
-                <td>{#if d.doc_type}<span class="badge">{d.doc_type}</span>{/if}</td>
-                <td class="num muted">{fdate(d.doc_date)}</td>
-                <td class="max-w-[220px] truncate muted">{d.counterparty ?? '—'}</td>
-                <td class="r num font-semibold">{d.gross !== null ? pln(d.gross) : d.net !== null ? pln(d.net) : '—'}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
-      <div class="mt-4 flex items-center justify-between text-[14px]">
-        <span class="faint">{tr('Strona', 'Page')} {page + 1} / {pages}</span>
-        <div class="flex gap-2">
-          <button class="icon-btn" disabled={page === 0} onclick={() => page--} aria-label="prev"><Icon name="left" size={16} /></button>
-          <button class="icon-btn" disabled={page >= pages - 1} onclick={() => page++} aria-label="next"><Icon name="right" size={16} /></button>
+    <div class="mt-4 grid gap-4 xl:grid-cols-3">
+      <Panel class="xl:col-span-2" title={tr('Wyciągi z najnowszych dokumentów', 'Excerpts from the latest documents')} sub={tr('krótko: czego dotyczą', 'in short: what they are about')} icon="report" i={7}>
+        <div class="grid gap-2.5 md:grid-cols-2">
+          {#each recent as d, i (d.id)}
+            <a class="block rounded-2xl bg-white/[0.025] p-4 transition hover:bg-white/[0.05] rise" style="--i:{i}" href={href(`/docs/${d.id}`)}>
+              <div class="flex items-center gap-2 text-[13px] faint"><span class="badge">{d.doc_type ?? 'dokument'}</span><span>{fdate(d.doc_date)}</span>{#if d.gross !== null}<span class="ml-auto font-semibold text-[#f4f4f5] num">{pln(d.gross, true)}</span>{/if}</div>
+              <div class="mt-2 truncate text-[15px] font-semibold">{d.title}</div>
+              <p class="mt-1 line-clamp-3 text-[14px] leading-relaxed muted">{d.summary}</p>
+            </a>
+          {/each}
         </div>
+      </Panel>
+      <div class="space-y-4">
+        {#if topInv.length}
+          <Panel title={tr('Największe faktury', 'Largest invoices')} icon="coins" group="locations" i={8}>
+            <div class="space-y-1.5">
+              {#each topInv as d (d.id)}
+                <a class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-3.5 py-2.5 transition hover:bg-white/[0.05]" href={href(`/docs/${d.id}`)}>
+                  <span class="min-w-0 flex-1"><span class="block truncate text-[14px] font-semibold">{d.number ?? d.title}</span><span class="block truncate text-[13px] faint">{party(d.counterparty)} · {fdate(d.doc_date)}</span></span>
+                  <span class="shrink-0 text-[14.5px] font-semibold num">{pln(amt(d), true)}</span>
+                </a>
+              {/each}
+            </div>
+          </Panel>
+        {/if}
+        {#if topics.length}
+          <Panel title={tr('Tematy', 'Topics')} sub={tr('kliknij, aby przeszukać treść', 'click to search the content')} icon="layers" i={9}>
+            <div class="flex flex-wrap gap-2">
+              {#each topics as [name, n]}<button class="pill pill-sm" onclick={() => { q = name; void search(); window.scrollTo(0, 0); document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' }); }}>{name}<span class="faint">{n}</span></button>{/each}
+            </div>
+          </Panel>
+        {/if}
       </div>
-    </Panel>
+    </div>
   {/if}
 {/if}
