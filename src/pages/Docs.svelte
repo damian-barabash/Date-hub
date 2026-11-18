@@ -161,6 +161,8 @@
   const amt = (r: FinRow) => Number(r.value_gross ?? 0);
   const openSum = $derived(money.filter((r) => r.pay_status === 'niezapłacona' || r.pay_status === 'częściowo').reduce((a, r) => a + Number(r.open ?? 0), 0));
   const unknownSum = $derived(money.filter((r) => r.pay_status === 'brak danych').reduce((a, r) => a + amt(r), 0));
+  // сумма по списку należności фирмы (без учёта найденных корректировок) + фирмы, которых нет в этом списке
+  const listTotal = $derived.by(() => { const lc = fin.summary?.list_check; if (!lc || category) return null; const others = (fin.summary?.sellers ?? []).filter((x) => !lc.sellers.includes(x.code)).reduce((a, x) => a + (x.open ?? 0), 0); return lc.list_total + others; });
   const newestAsof = $derived(money.map((r) => r.pay_asof).filter(Boolean).sort().pop() ?? null);
   const types = $derived.by(() => { const m = new Map<string, number>(); for (const d of list) m.set(d.doc_type ?? '—', (m.get(d.doc_type ?? '—') ?? 0) + 1); return [...m.entries()].map(([type, n]) => ({ type, n })).sort((a, b) => b.n - a.n); });
   const byMonth = $derived.by(() => {
@@ -230,7 +232,7 @@
   <div class="kpis">
     <Kpi hero i={0} label={tr('Dokumenty', 'Documents')} value={list.length || null} format="int" compact={false} icon="report" {loading} hint={list.length ? `${fdate(list.reduce((m, d) => (d.doc_date && (!m || d.doc_date < m) ? d.doc_date : m), null as string | null))} – ${fdate(list.reduce((m, d) => (d.doc_date && (!m || d.doc_date > m) ? d.doc_date : m), null as string | null))}` : ''} />
     {#if money.length}<Kpi i={1} label={tr('Zafakturowano (brutto)', 'Invoiced (gross)')} value={total} format="pln" icon="coins" hint="{money.length} {tr('faktur, każda kwota liczona raz', 'invoices, each amount counted once')}{!category && fin.summary?.duplicates_removed ? ` · ${tr('bez dubli', 'w/o duplicates')} ${pln(fin.summary.duplicates_removed, true)}` : ''}" />
-      <Kpi i={2} label={tr('Należności otwarte', 'Open receivables')} value={openSum} format="pln" icon="alert" group="alerts" hint="{newestAsof ? `${tr('najnowsze dane', 'latest data')}: ${fdate(newestAsof)}` : ''}{unknownSum ? ` · ${tr('status nieznany', 'status unknown')} ${pln(unknownSum, true)}` : ''}" />{/if}
+      <Kpi i={2} label={tr('Należności (po korektach)', 'Receivables (after corrections)')} value={openSum} format="pln" icon="alert" group="alerts" hint="{listTotal !== null && Math.abs(listTotal - openSum) > 0.01 ? `${tr('wg listy firmy', 'per company list')}: ${pln(listTotal, true)} · ` : ''}{newestAsof ? `${tr('dane', 'data')}: ${fdate(newestAsof)}` : ''}{unknownSum ? ` · ${tr('status nieznany', 'status unknown')} ${pln(unknownSum, true)}` : ''}" />{/if}
     <Kpi i={2} label={tr('Kontrahenci', 'Counterparties')} value={new Set(list.map((d) => d.counterparty).filter(Boolean).map((x) => party(x))).size || null} format="int" compact={false} icon="users" />
     <Kpi i={3} label={tr('Rodzaje dokumentów', 'Document types')} value={types.length || null} format="int" compact={false} icon="layers" hint={types.slice(0, 2).map((x) => x.type).join(', ')} />
   </div>

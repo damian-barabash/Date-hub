@@ -49,6 +49,8 @@ export interface Ledger {
   built_at: string; parties: Party[]; invoices: Invoice[]; payments: Payment[]; allocations: Allocation[]; orders: Order[];
   sources: { id: string; title: string; kind: 'invoice' | 'registry' | 'payment' | 'note' | 'skipped'; asof?: string | null; rows?: number; note?: string }[];
   checks: { level: 'error' | 'warn' | 'info'; code: string; msg: string; key?: string }[];
+  /** сравнение с самым свежим списком należności фирмы: их сумма vs реестр, и почему отличаются */
+  listCheck?: { source: string; asof: string | null; sellers: string[]; list_total: number; ledger_total: number; diffs: { number: string; seller: string; list_open: number; ledger_open: number; why: string }[] };
 }
 
 // ───────────────────────── утилиты ─────────────────────────
@@ -662,6 +664,27 @@ export function buildLedger(docs: SrcDoc[], opts: BuildOptions = {}): Ledger {
   }
   ledger.orders = [...om.values()].sort((a, b) => a.order_no.localeCompare(b.order_no));
 
+  // ── 8. сверка с самым свежим списком należności фирмы — чтобы любая разница была объяснена
+  // najnowszy arkusz należności; jeśli ma kilka tabel (główna + podziały), bierzemy największą
+  const maxAsof = sheets.filter((x) => x.openOnly && x.asof).map((x) => x.asof!).sort().pop();
+  const newest = sheets.filter((x) => x.openOnly && x.asof === maxAsof).sort((a, b) => a.rows.length - b.rows.length).pop();
+  if (newest) {
+    const seen = new Set<string>(); let listTotal = 0; let ledgerTotal = 0; const diffs: NonNullable<Ledger['listCheck']>['diffs'] = []; const sellers = new Set<string>();
+    for (const r of newest.rows) {
+      const kind = regKind(r.kind) ?? (/^(ZAL|FZ)/i.test(r.number ?? '') ? 'zaliczkowa' : 'faktura');
+      const nk = numberKey(r.number ?? '', kind); const g = amount(r.gross);
+      const nip = resolveSeller(r.seller, nk, g);
+      const inv = all.find((i) => i.seller_nip === nip && i.number_key === nk);
+      const key = `${nip}#${nk}`; if (seen.has(key)) continue; seen.add(key); // лист może zawierać kilka tabel z tymi samymi fakturami
+      const lo = amount(r.open) ?? 0; listTotal = r2(listTotal + lo);
+      const mo = inv && (inv.pay_status === 'niezapłacona' || inv.pay_status === 'częściowo') ? inv.open ?? 0 : 0; ledgerTotal = r2(ledgerTotal + mo);
+      if (inv) sellers.add(inv.seller_code);
+      if (!eq(lo, mo)) diffs.push({ number: r.number ?? '?', seller: inv?.seller_code ?? r.seller ?? '?', list_open: lo, ledger_open: mo,
+        why: !inv ? 'brak tej faktury w dokumentach' : inv.pay_status === 'skorygowana' ? `skorygowana do zera (${inv.issues.find((x) => /korekt/i.test(x)) ?? 'korekta'}) — lista należności nie uwzględnia korekty` : `status w rejestrze: ${inv.pay_status}` });
+    }
+    ledger.listCheck = { source: `${newest.title} / ${newest.sheet}`, asof: newest.asof, sellers: [...sellers], list_total: listTotal, ledger_total: ledgerTotal, diffs };
+  }
+
   ledger.parties = [...parties.values()];
   ledger.invoices = all.sort((a, b) => (a.issue_date ?? '').localeCompare(b.issue_date ?? '') || a.number.localeCompare(b.number));
   return ledger;
@@ -733,6 +756,7 @@ export function financeSummary(l: Ledger) {
       return [...m.values()].sort((a, b) => a.year.localeCompare(b.year));
     })(),
     registries: l.sources.filter((s) => s.kind === 'registry').map((s) => ({ title: s.title, asof: s.asof, rows: s.rows })),
+    list_check: l.listCheck ?? null,
     errors: l.checks.filter((x) => x.level === 'error').map((x) => x.msg),
     warnings: l.checks.filter((x) => x.level === 'warn').length,
   };

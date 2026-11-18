@@ -5,7 +5,7 @@ export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 // Текущий воркспейс уходит заголовком x-workspace в КАЖДЫЙ запрос (REST, RPC, edge) — сервер (public.cur_ws) сам фильтрует данные.
 const WS_KEY = 'dh-ws';
 let WS: string | null = (() => { try { return localStorage.getItem(WS_KEY); } catch { return null; } })();
-export const getWorkspace = () => WS;
+export const getWorkspace = () => { try { return localStorage.getItem(WS_KEY) ?? WS; } catch { return WS; } };
 export function setWorkspace(id: string | null) {
   WS = id;
   try { if (id) localStorage.setItem(WS_KEY, id); else localStorage.removeItem(WS_KEY); } catch { /* приватный режим */ }

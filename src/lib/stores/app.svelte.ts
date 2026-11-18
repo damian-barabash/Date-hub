@@ -92,9 +92,18 @@ export function switchWorkspace(id: string) {
   location.reload();
 }
 
+let geoRunning = false;
+/** Адреса точек без координат дорабатываются в фоне при каждом входе — пока не найдены все. */
+function resumeGeocoding() {
+  if (geoRunning || !app.locations.some((l) => l.status === 'pending')) return;
+  geoRunning = true;
+  import('../data/geocode').then((m) => m.geocodeAll(loadLocations, (_left, _t) => undefined)).catch(() => null).finally(() => { geoRunning = false; void loadLocations(); });
+}
+
 export async function loadAll() {
   await loadWorkspaces();
   await Promise.all([loadDatasets(), loadChats(), loadLocations(), loadDocStats()]);
+  resumeGeocoding();
 }
 
 export async function logout() {

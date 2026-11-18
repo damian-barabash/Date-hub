@@ -11,6 +11,8 @@ export interface FinSummary {
   open_confirmed: number; open_count: number; unknown_gross: number; unknown_count: number; advance_left: number;
   open_by_source: { source: string; asof: string | null; invoices: number; open: number; sellers: string[] }[];
   errors: string[]; warnings: number;
+  sellers?: { code: string; open: number }[];
+  list_check?: { source: string; asof: string | null; sellers: string[]; list_total: number; ledger_total: number; diffs: { number: string; seller: string; list_open: number; ledger_open: number; why: string }[] } | null;
 }
 
 export const fin = $state({ rows: [] as FinRow[], summary: null as FinSummary | null, builtAt: '', checks: [] as { level: string; msg: string }[], loading: false });

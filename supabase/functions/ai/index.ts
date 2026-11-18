@@ -41,7 +41,7 @@ If no data is needed (greeting, general question) answer immediately with the fi
 - List every document you relied on in "docs" (their refs, e.g. ["D2","D5"]).
 
 ## Time scope
-- Default period = the CURRENT one: the current year (today's year) or, if it has no data, the latest period with data. Earlier years (e.g. 2025) only when the user asks for them, as an explicit comparison, or for an all-time question — and then label the year in every title.
+- STRICT: if there is ANY data or document dated in the CURRENT year (see FOCUS YEAR in DATA CONTEXT), show ONLY the current year — do not open, quote or chart documents, budgets or figures from earlier years. If the current year has no data on the topic, use the LATEST year that has data and say so. Earlier years only when the user explicitly asks (a year, "porównaj z 2025", "od początku") — and then label the year in every title.
 - Never mix years in one total without saying so; always write the period in chart/kpi titles ("2026", "I–XI 2026").
 
 ## Companies
@@ -163,6 +163,8 @@ function docsCard(stats: any): string {
   const L: string[] = [];
   L.push(`DOCUMENTS: ${stats.total} company documents (text only), dates ${stats.min_date ?? '?'} … ${stats.max_date ?? '?'}.`);
   L.push(`Categories: ${(stats.cats ?? []).map((c: any) => `${c.category} (${c.n})`).join('; ')}`);
+  const yrs = (stats.years ?? []) as { y: string; n: number }[]; const cy = String(new Date().getFullYear());
+  if (yrs.length) L.push(`Documents by year: ${yrs.map((x) => `${x.y ?? 'bez daty'}: ${x.n}`).join('; ')}. FOCUS YEAR = ${yrs.some((x) => x.y === cy) ? cy : yrs.filter((x) => x.y).map((x) => x.y).sort().pop()} (filter documents by doc_date in that year; documents without date only if their title/content is clearly about that year).`);
   L.push(`Types: ${(stats.types ?? []).map((c: any) => `${c.doc_type} (${c.n})`).join('; ')}`);
   L.push('SQL table public.documents(id, title, path [source folder], category, doc_type, summary, doc_date, counterparty [raw text, many name variants], party_code [company code merged by NIP: group by THIS, not counterparty], number, net, vat, gross, currency, pages, chars) — one row per document; use it for counts, sums by month (date_trunc(\'month\', doc_date)), by counterparty, by type, lists. Text content is NOT in SQL: use "docs" search/open for it.');
   L.push('MONEY RULE: NEVER sum documents.net/vat/gross — those are rough AI extractions and the same money appears in many files (copies, summaries, budgets, advance + settlement invoices). Every amount of invoices, payments, receivables, advances and orders comes from the FINANCE LEDGER below. A single document amount (one order, one budget line, one report) may be quoted with its title. Keep the number of SQL queries small (aim for ≤ 4 per answer).');
@@ -187,6 +189,7 @@ function financeCard(fin: any, parties: any[]): string {
 - Totals of invoicing (sprzedaż / zafakturowano / obroty): sum(value_net), sum(value_gross) FROM fin_invoices WHERE counted — with NO filter on kind (advance invoices are part of the total; settlement duplicates are already 0) and NO filter on documents.category (one ledger for the whole workspace). Yearly totals must equal the "per year" line below. Group companies by seller_code. Months: date_trunc('month', issue_date).
 - Why value_* differs from gross: an advance invoice (zaliczkowa) is the prepayment; a settlement invoice (rozliczeniowa, "Faktura VAT do faktury zaliczkowej", "Faktura rozliczeniowa do zaliczki") re-invoices the SAME money → value 0; lines "Rozliczenie transzy do zaliczki" are already deducted inside an invoice; korekta carries its (negative) difference; noty only move money. Explain this briefly when the user asks why numbers differ from a spreadsheet.
 - Receivables (należności): SELECT … FROM fin_receivables. ALWAYS state the source and date ("stan na <pay_asof> wg <pay_source>"). Report separately: (a) open according to the newest source of each invoice — if that source is older than 30 days, say "ostatnie dane z <date>" instead of calling it confirmed (label such KPIs "Otwarte wg ostatnich danych"), (b) status unknown (pay_status = 'brak danych' — the newest list of receivables no longer shows them, but no payment confirmation) — never add (b) to (a); (c) advances not yet settled (advance_left) are not debts.
+- "Ile nam wiszą / należności / ile CK musi zapłacić": ALWAYS give BOTH totals from "company receivables list check" — (1) according to the company's own receivables list (+ companies not on it) and (2) after corrections found in documents — and name every difference (e.g. an advance invoice cancelled by a korekta that the list still shows). Never present only one of them as "the" number. Then status-unknown separately.
 - A specific invoice / order / advance: query fin_invoices / fin_orders, cite doc_titles[1], and show its "issues" if any.
 - If fin_checks has errors related to the question (e.g. the same advance settled twice), say so in **Uwaga**.
 - Never round money in tables; in text use "1 234 567,89 zł".`);
@@ -195,6 +198,7 @@ function financeCard(fin: any, parties: any[]): string {
 - per year (canonical, invoiced counted once): ${(s.by_year ?? []).map((y: any) => `${y.year}: ${zl(y.gross)} brutto / ${zl(y.net)} netto, ${y.invoices} faktur (${Object.entries(y.sellers).map(([k, v]) => `${k} ${zl(v as number)}`).join(', ')})`).join(' | ')}
 - per company: ${(s.sellers ?? []).map((x: any) => `${x.code}: ${x.invoices} faktur, ${zl(x.value_gross)} brutto / ${zl(x.value_net)} netto, otwarte potwierdzone ${zl(x.open)} (${x.open_n}), status nieznany ${zl(x.unknown)} (${x.unknown_n})`).join(' | ')}
 - receivables open (newest source per invoice): ${zl(s.open_confirmed)} in ${s.open_count} invoices; by source: ${(s.open_by_source ?? []).map((o: any) => `${zl(o.open)} (${o.invoices} fv, ${o.sellers.join('/')}) wg ${o.source} stan na ${o.asof ?? '?'}`).join('; ')}
+- company receivables list check: ${s.list_check ? (() => { const lc = s.list_check; const others = (s.sellers ?? []).filter((x: any) => !lc.sellers.includes(x.code)).reduce((a: number, x: any) => a + (x.open ?? 0), 0); return `the newest list „${lc.source}” (stan na ${lc.asof}, firmy ${lc.sellers.join('/')}) totals ${zl(lc.list_total)}; the ledger for the same invoices: ${zl(lc.ledger_total)}${lc.diffs.length ? `; difference: ${lc.diffs.map((d: any) => `${d.seller} ${d.number}: lista ${zl(d.list_open)}, rejestr ${zl(d.ledger_open)} — ${d.why}`).join('; ')}` : ' (identical)'}. Other companies not on that list (open per their newest source): ${zl(others)}. TOTAL according to the company's list + others = ${zl(lc.list_total + others)}; TOTAL after the corrections found in documents = ${zl(lc.ledger_total + others)}.`; })() : 'no receivables list found'}
 - status unknown: ${zl(s.unknown_gross)} in ${s.unknown_count} invoices; advances not yet settled: ${zl(s.advance_left)}
 - company registries used: ${(s.registries ?? []).map((r: any) => `${r.title} (stan na ${r.asof}, ${r.rows} wierszy)`).join('; ')}
 - engine errors: ${(s.errors ?? []).join(' || ') || 'none'}; warnings: ${s.warnings} (see fin_checks)`);
@@ -303,9 +307,18 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
         }
       }
 
+      // вкладка: год фокуса = текущий, если в этой группе есть документы этого года; иначе последний год с документами
+      let focusNote = '';
+      if (dash) {
+        const { data: dd } = await db.from('documents').select('doc_date, title').eq('workspace_id', ws).eq('category', dash).limit(5000);
+        const cy = String(new Date().getFullYear()); const by = new Map<string, number>();
+        for (const d of dd ?? []) { const y = d.doc_date ? String(d.doc_date).slice(0, 4) : (String(d.title).match(/20\d\d/)?.[0] ?? ''); if (y) by.set(y, (by.get(y) ?? 0) + 1); }
+        const fy = by.has(cy) ? cy : [...by.keys()].sort().pop() ?? cy;
+        focusNote = `FOCUS YEAR for tab „${dash}”: ${fy} (${by.get(fy) ?? 0} documents dated ${fy}; other years: ${[...by.entries()].filter(([y]) => y !== fy).map(([y, n]) => `${y}: ${n}`).join(', ') || 'none'}). Build EVERY block from ${fy} only: SQL with doc_date in ${fy} (or issue_date in ${fy} for the ledger), open only documents dated ${fy} or whose title names ${fy}. Do not use documents, budgets or figures from other years at all${edit ? ' unless the user\'s request names another year' : ''}. Every title must state ${fy}.`;
+      }
       const msgs: { role: string; content: string }[] = [
         { role: 'system', content: SYSTEM },
-        { role: 'system', content: `WORKSPACE: ${wsRow?.name ?? '?'} — every table and document you see belongs only to this workspace.` },
+        { role: 'system', content: `WORKSPACE: ${wsRow?.name ?? '?'} — every table and document you see belongs only to this workspace.${focusNote ? `\n${focusNote}` : ''}` },
         { role: 'system', content: `WEB ACCESS: ${s.web ? 'on' : 'off (do not request "web"; say that internet access is disabled in settings if it is needed)'}. Today: ${new Date().toISOString().slice(0, 10)}.` },
         { role: 'system', content: `DATA CONTEXT\n${financeCard(fin, parties ?? [])}\n\n${docsCard(docStats)}\n\n${dataset ? datasetCard(dataset, locCount ?? 0, others ?? []).replace(/^DATA CONTEXT\n/, 'SALES TABLE\n') : `SALES TABLE: none loaded. Lookup table public.locations(code, name, city, street, postal, region, branch, kind, email, lat, lng) — ${locCount ?? 0} shops.`}` },
         ...history,
@@ -317,7 +330,7 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
       let final: any = null; let nudged = false;
       const docLog: { id: string; kind: string; q: string }[] = [];
       const idToRef = new Map<string, string>(); const refToId = new Map<string, string>(); const idToTitle = new Map<string, string>(); const usedDocs = new Set<string>();
-      const rounds = dash ? 7 : s.max_rounds + (s.web ? 2 : 0) + (docStats?.total ? 2 : 0);
+      const rounds = dash ? 9 : s.max_rounds + (s.web ? 2 : 0) + (docStats?.total ? 2 : 0);
       for (let round = 0; round <= rounds; round++) {
         await send('status', { step: round === 0 ? 'thinking' : 'analysing', round });
         const r = await deepseek(msgs, { model: s.model, temperature: s.temperature, json: true, max_tokens: dash ? 5000 : 3000 });
@@ -401,6 +414,14 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
         const r = await deepseek(msgs, { model: s.model, temperature: s.temperature, json: true, max_tokens: 3000 });
         usage.prompt += r.usage.prompt_tokens ?? 0; usage.hit += r.usage.prompt_cache_hit_tokens ?? 0; usage.completion += r.usage.completion_tokens ?? 0;
         final = parseJson<any>(r.content) ?? { text: r.content.slice(0, 3000) };
+        // модель всё ещё просит данные вместо ответа — ещё одна, жёсткая попытка
+        if (!(Array.isArray(final?.blocks) && final.blocks.length) && (final?.queries || final?.docs || /^\s*\{\s*"(queries|docs|web)"/.test(String(final?.text ?? '')))) {
+          msgs.push({ role: 'assistant', content: r.content.slice(0, 1500) });
+          msgs.push({ role: 'user', content: 'NO more queries, docs or web are possible. Reply ONLY with the final json {"title","text","blocks":[…],"suggestions"} built from the RESULTS above (blocks may reference existing q ids).' });
+          const r2 = await deepseek(msgs, { model: s.model, temperature: 0.1, json: true, max_tokens: dash ? 5000 : 3000 });
+          usage.prompt += r2.usage.prompt_tokens ?? 0; usage.hit += r2.usage.prompt_cache_hit_tokens ?? 0; usage.completion += r2.usage.completion_tokens ?? 0;
+          final = parseJson<any>(r2.content) ?? final;
+        }
       }
 
       await send('status', { step: 'visualising' });

@@ -2,7 +2,10 @@
   // Загрузка документов: файлы читаются в браузере, на сервер уходит только текст.
   import { extractFile, stopOcr } from '../docs/extract';
   import { analyzeAll, docs, loadDocStats, saveDoc } from '../docs/store.svelte';
-  import { toast } from '../stores/app.svelte';
+  import { app, loadDatasets, loadLocations, toast } from '../stores/app.svelte';
+  import { importDataset, importDirectory, inspectSpreadsheet } from '../data/importer';
+  import { geocodeAll } from '../data/geocode';
+  import { clearCache } from '../data/api';
   import { tr } from '../i18n.svelte';
   import { go } from '../router.svelte';
   import { int } from '../format';
@@ -42,20 +45,43 @@
     busy = true;
     const start = items.length;
     items.push(...list.map((x) => ({ name: [x.path, x.file.name].filter(Boolean).join('/'), state: 'wait' as const, note: '' })));
-    let saved = 0;
+    let saved = 0; let tables = 0; let dirs = 0;
     for (let i = 0; i < list.length; i++) {
       const it = items[start + i];
       it.state = 'read'; it.note = tr('czytam…', 'reading…');
       try {
-        const r = await extractFile(list[i].file, list[i].path, (m) => (it.note = m));
+        // arkusz: najpierw sprawdzamy, czy to tabela danych (całość → analiza) albo słownik punktów
+        const f = list[i].file;
+        if (/\.(xlsx|xlsm|xls|csv|ods)$/i.test(f.name)) {
+          it.note = tr('rozpoznaję tabelę…', 'recognising the table…');
+          const sp = await inspectSpreadsheet(f, new Set(app.locations.map((l) => l.code)));
+          if (sp.kind === 'dataset') {
+            await importDataset(sp.inf, { name: f.name.replace(/\.[^.]+$/, ''), file: f.name, sheet: sp.sheet }, (d, t, ph) => (it.note = ph === 'finalize' ? tr('analizuję kolumny…', 'profiling columns…') : `${tr('wczytuję', 'loading')} ${int(d)} / ${int(t)}`));
+            tables++;
+            it.state = 'ok'; it.note = `${tr('tabela danych', 'data table')}: ${int(sp.inf.rows.length)} ${tr('wierszy → analityka', 'rows → analytics')}`;
+            if (sp.sheets <= 1) continue; // inne arkusze — dodatkowo jako dokument
+          } else if (sp.kind === 'directory') {
+            const n = await importDirectory(sp.inf, sp.map);
+            dirs++;
+            it.state = 'ok'; it.note = `${tr('słownik punktów', 'point directory')}: ${int(n)}`;
+            continue;
+          }
+        }
+        const r = await extractFile(f, list[i].path, (m) => (it.note = m));
         for (const d of r.docs) { if (await saveDoc(d)) saved++; }
-        if (r.docs.length) { it.state = 'ok'; it.note = `${int(r.docs.reduce((a, d) => a + d.text.length, 0))} ${tr('znaków', 'chars')}${r.docs.some((d) => d.ocr) ? ' · OCR' : ''}${r.docs.length > 1 ? ` · ${r.docs.length} ${tr('plików', 'files')}` : ''}`; }
+        if (r.docs.length && it.state === 'ok') it.note += ` · ${tr('także jako dokument', 'also as a document')}`;
+        else if (r.docs.length) { it.state = 'ok'; it.note = `${int(r.docs.reduce((a, d) => a + d.text.length, 0))} ${tr('znaków', 'chars')}${r.docs.some((d) => d.ocr) ? ' · OCR' : ''}${r.docs.length > 1 ? ` · ${r.docs.length} ${tr('plików', 'files')}` : ''}`; }
         else { it.state = 'skip'; it.note = r.skipped[0]?.reason ?? tr('pominięte', 'skipped'); }
       } catch (e) { it.state = 'err'; it.note = e instanceof Error ? e.message : String(e); }
     }
     await stopOcr();
     busy = false;
     await loadDocStats();
+    if (tables || dirs) {
+      clearCache(); await Promise.all([loadDatasets(), loadLocations()]);
+      toast(tables ? tr('Tabela danych wczytana w całości — analityka sprzedaży gotowa', 'Data table loaded in full — sales analytics ready') : tr('Słownik punktów zaktualizowany', 'Point directory updated'));
+      if (app.locations.some((l) => l.status === 'pending')) void geocodeAll(loadLocations).catch(() => null); // adresy punktów → mapa
+    }
     if (saved) { toast(tr(`Zapisano tekst z ${saved} dokumentów — porządkuję`, `Saved text from ${saved} documents — organising`)); void analyzeAll(); }
   }
   const pick = (fl: FileList | null) => run([...(fl ?? [])].map((f) => ({ file: f, path: ((f as any).webkitRelativePath ?? '').split('/').slice(0, -1).join('/') })));
