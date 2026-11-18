@@ -599,7 +599,8 @@ export function buildLedger(docs: SrcDoc[], opts: BuildOptions = {}): Ledger {
     }
     if (i.kind === 'korekta') {
       const base = i.corrects ? byKey(i.seller_nip, i.corrects) ?? all.find((x) => x.seller_nip === i.seller_nip && core(x.number_key) === core(i.corrects!)) : undefined;
-      if (base) { base.issues.push(`skorygowana korektą ${i.number} (${i.gross} zł)`); (base as any)._corrected = i; if (base.kind === 'zaliczkowa' && base.advance_left !== null) base.advance_left = r2(base.advance_left + (i.gross ?? 0)); }
+      // domyślnie sumy BEZ korekt (tak liczy firma): faktura korygowana zostaje z kwotą i statusem z zestawień, korekta jest tylko informacją
+      if (base) { base.issues.push(`korekta ${i.number} (${i.gross} zł) — nie wliczana do sum domyślnych`); (base as any)._corrected = i; }
       else if (i.corrects) i.issues.push(`korygowana faktura ${i.corrects.replace(/\|/g, '/')} nie znaleziona`);
     }
   }
@@ -624,9 +625,7 @@ export function buildLedger(docs: SrcDoc[], opts: BuildOptions = {}): Ledger {
   for (const s of sheets) for (const r of s.rows) { const d = isoDate(r.date, true); if (!d) continue; const c = cover.get('*') ?? [d, d]; cover.set('*', [d < c[0] ? d : c[0], d > c[1] ? d : c[1]]); }
   const [cFrom, cTo] = cover.get('*') ?? ['', ''];
   for (const i of all) {
-    const corr = (i as any)._corrected as Invoice | undefined;
-    if (corr && i.gross !== null && eq(r2(i.gross + (corr.gross ?? 0)), 0)) { i.pay_status = 'skorygowana'; i.open = 0; }
-    else if (i.kind === 'korekta') { i.pay_status = 'skorygowana'; i.open = 0; }
+    if (i.kind === 'korekta') { i.pay_status = 'skorygowana'; i.open = 0; i.counted = false; } // korekty poza sumami domyślnymi
     else if (i.kind === 'rozliczeniowa' && eq(i.value_gross, 0)) { i.pay_status = 'rozliczona zaliczką'; i.open = 0; }
     else if (i.open === null && i.paid === null) i.pay_status = 'brak danych';
     else if ((i as any)._absent) { i.pay_status = 'brak danych'; i.open = null; i.paid = null; } // ostatnia znana kwota zostaje w observations
@@ -757,6 +756,12 @@ export function financeSummary(l: Ledger) {
     })(),
     registries: l.sources.filter((s) => s.kind === 'registry').map((s) => ({ title: s.title, asof: s.asof, rows: s.rows })),
     list_check: l.listCheck ?? null,
+    // korekty — tylko na pytanie: ich suma i wpływ na należności
+    corrections: l.invoices.filter((i) => i.kind === 'korekta').map((i) => {
+      const base = i.corrects ? l.invoices.find((x) => x.seller_nip === i.seller_nip && (x.number_key === i.corrects || x.number_key.replace(/^[A-Z]*\|/, '|') === i.corrects!.replace(/^[A-Z]*\|/, '|'))) : undefined;
+      const openEffect = base && (base.pay_status === 'niezapłacona' || base.pay_status === 'częściowo') ? -Math.min(base.open ?? 0, Math.abs(i.gross ?? 0)) : 0;
+      return { seller: i.seller_code, number: i.number, date: i.issue_date, gross: i.gross, corrects: base?.number ?? i.corrects, open_effect: r2(openEffect) };
+    }),
     errors: l.checks.filter((x) => x.level === 'error').map((x) => x.msg),
     warnings: l.checks.filter((x) => x.level === 'warn').length,
   };
