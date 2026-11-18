@@ -2,17 +2,36 @@ import { createClient, type SupabaseClient, type User } from 'npm:@supabase/supa
 
 export const cors = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret, x-workspace',
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
 export const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: { ...cors, 'content-type': 'application/json' } });
 
-export const admin = (): SupabaseClient =>
+/** Сервисный клиент. С ws — все RPC и SQL ИИ работают в этом воркспейсе (заголовок x-workspace → public.cur_ws()). */
+export const admin = (ws?: string | null): SupabaseClient =>
   createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { persistSession: false, autoRefreshToken: false },
+    ...(ws ? { global: { headers: { 'x-workspace': ws } } } : {}),
   });
+
+/** Воркспейс запроса (заголовок x-workspace), если у пользователя есть к нему доступ (админ — ко всем). */
+export async function requireWorkspace(req: Request, user: User): Promise<string | null> {
+  const ws = req.headers.get('x-workspace') ?? '';
+  if (!/^[0-9a-f-]{36}$/i.test(ws)) return null;
+  const db = admin();
+  const [{ data: w }, { data: p }, { data: m }] = await Promise.all([
+    db.from('workspaces').select('id').eq('id', ws).maybeSingle(),
+    db.from('profiles').select('is_admin').eq('id', user.id).maybeSingle(),
+    db.from('workspace_members').select('user_id').eq('workspace_id', ws).eq('user_id', user.id).maybeSingle(),
+  ]);
+  return w && (p?.is_admin || m) ? ws : null;
+}
+export async function isAdmin(user: User): Promise<boolean> {
+  const { data } = await admin().from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+  return !!data?.is_admin;
+}
 
 /** Проверка сессии вошедшего пользователя (JWT из заголовка). */
 export async function requireUser(req: Request): Promise<User | null> {

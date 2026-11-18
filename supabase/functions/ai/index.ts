@@ -6,15 +6,16 @@
 //  4) диаграммы ссылаются на результат запроса по id — модель не печатает массивы данных;
 //  5) история — только тексты последних N ответов, обрезанные;
 //  6) кэш одинаковых вопросов (по версии набора данных).
-import { admin, cors, deepseek, json, parseJson, requireUser, sha256, type DeepSeekUsage } from '../_shared/util.ts';
+import { admin, cors, deepseek, json, parseJson, requireUser, requireWorkspace, sha256, type DeepSeekUsage } from '../_shared/util.ts';
 import { webFetch, webSearch, type WebResult } from '../_shared/web.ts';
+import { ensureFinance } from '../_shared/finbuild.ts';
 
 interface Settings { model: string; temperature: number; history_turns: number; rows_to_model: number; rows_to_client: number; cache: boolean; cache_ttl_hours: number; max_rounds: number; web: boolean }
 interface Query { id: string; sql: string; purpose?: string }
 interface Result { columns: string[]; rows: Record<string, unknown>[]; error?: string; sql: string; purpose?: string }
 
-const SYSTEM = `You are "AI DATA HUB", a senior retail-analytics assistant for company directors (CK Complex, a Polish chain of e-cigarette / vape shops).
-You answer questions about sales, managers (kierownicy), shops/warehouses (magazyny), products, margins and finances using a PostgreSQL database, and — when the question needs outside facts — the public internet.
+const SYSTEM = `You are "AI DATA HUB", a senior analyst and controller for company management. Context: an agency group (its companies are listed in COMPANY in DATA CONTEXT) runs projects for the client CK Complex (a Polish chain of e-cigarette / vape shops, brand VYPOINT): orders (zamówienia GW/…), invoices, advances, budgets, audits, campaigns, the VYPOINT platform. Optionally a sales table of CK shops is loaded.
+You answer questions about money (invoices, receivables, advances, orders, budget), documents, projects and — if loaded — shop sales, using a PostgreSQL database, the company documents and, when the question needs outside facts, the public internet. You know this firm: before answering about money always use the FINANCE LEDGER — it is exact to the grosz; your own sums of document fields are not.
 Always reply with ONE json object, no prose outside json.
 
 ## Protocol
@@ -38,6 +39,13 @@ If no data is needed (greeting, general question) answer immediately with the fi
 - Tables built from documents must have a column "dokument" with the title (and "data" when known), so every row can be traced.
 - If two documents disagree, show both titles and both values.
 - List every document you relied on in "docs" (their refs, e.g. ["D2","D5"]).
+
+## Time scope
+- Default period = the CURRENT one: the current year (today's year) or, if it has no data, the latest period with data. Earlier years (e.g. 2025) only when the user asks for them, as an explicit comparison, or for an all-time question — and then label the year in every title.
+- Never mix years in one total without saying so; always write the period in chart/kpi titles ("2026", "I–XI 2026").
+
+## Companies
+- One company = one NIP. Name variants (e.g. "MTM CONSULTING", "MARIUSZ MIĘKOŚ MTM CONSULTING", "MTM CONSULTING MARIUSZ MIĘKOŚ") are ONE company — use seller_code / seller_nip from the FINANCE LEDGER, or documents.party_code (company code matched by NIP/aliases) when grouping documents. Never show name variants as separate companies.
 
 ## Act first, never refuse first
 - Never answer "I don't know", "I have no data" or "I have no access" before trying. Order: 1) SQL on the database, 2) web search / open APIs, 3) combine. Only after real attempts explain concretely what you tried and what exactly is missing — and still give the best partial result plus the next step.
@@ -156,8 +164,40 @@ function docsCard(stats: any): string {
   L.push(`DOCUMENTS: ${stats.total} company documents (text only), dates ${stats.min_date ?? '?'} … ${stats.max_date ?? '?'}.`);
   L.push(`Categories: ${(stats.cats ?? []).map((c: any) => `${c.category} (${c.n})`).join('; ')}`);
   L.push(`Types: ${(stats.types ?? []).map((c: any) => `${c.doc_type} (${c.n})`).join('; ')}`);
-  L.push('SQL table public.documents(id, title, path [source folder], category, doc_type, summary, doc_date, counterparty, number, net, vat, gross, currency, pages, chars) — one row per document; use it for counts, sums by month (date_trunc(\'month\', doc_date)), by counterparty, by type, lists. Text content is NOT in SQL: use "docs" search/open for it.');
-  L.push('MONEY RULE: for any sum of money over time, by counterparty or in total use the view public.invoices(id, title, doc_type, doc_date, counterparty, party [normalised company name — group by this], number, net, vat, gross, currency) — invoices only, de-duplicated (the same invoice is stored in several folders). NEVER sum documents.gross across documents: summaries (zestawienie), budgets and reports repeat totals of other documents. A single document amount (one order, one budget, one report) may be quoted with its title. Advance invoices (doc_type = \'faktura zaliczkowa\') and the final invoice for the same order can cover the same money: when totalling, show \'faktura\' and \'faktura zaliczkowa\' as separate figures and say that they may overlap. Keep the number of SQL queries small (aim for ≤ 4 per answer).');
+  L.push('SQL table public.documents(id, title, path [source folder], category, doc_type, summary, doc_date, counterparty [raw text, many name variants], party_code [company code merged by NIP: group by THIS, not counterparty], number, net, vat, gross, currency, pages, chars) — one row per document; use it for counts, sums by month (date_trunc(\'month\', doc_date)), by counterparty, by type, lists. Text content is NOT in SQL: use "docs" search/open for it.');
+  L.push('MONEY RULE: NEVER sum documents.net/vat/gross — those are rough AI extractions and the same money appears in many files (copies, summaries, budgets, advance + settlement invoices). Every amount of invoices, payments, receivables, advances and orders comes from the FINANCE LEDGER below. A single document amount (one order, one budget line, one report) may be quoted with its title. Keep the number of SQL queries small (aim for ≤ 4 per answer).');
+  return L.join('\n');
+}
+
+const zl = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${n.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł`);
+
+// Финансовый реестр: структура + готовые итоги (модель их копирует, а детали берёт SQL-запросом)
+function financeCard(fin: any, parties: any[]): string {
+  if (!fin?.summary) return 'FINANCE LEDGER: not built yet (no invoices found in documents).';
+  const s = fin.summary; const L: string[] = [];
+  const sellers = parties.filter((p) => p.role === 'seller'); const buyers = parties.filter((p) => p.role === 'buyer');
+  L.push(`COMPANY: our group (sellers, "my / nam / nasze firmy"): ${sellers.map((p) => `${p.code} = ${p.name} (NIP ${p.nip})`).join('; ')}. Client: ${buyers.map((p) => `${p.code} = ${p.name} (NIP ${p.nip})`).join('; ')}. Name variants of one company are merged by NIP (e.g. "MTM CONSULTING", "MARIUSZ MIĘKOŚ MTM CONSULTING" = MTMC). "Ile nam wiszą / należności / zaległości" = what the client still owes our companies.`);
+  L.push(`FINANCE LEDGER (built ${String(fin.built_at).slice(0, 16).replace('T', ' ')} by a deterministic engine from the invoice texts, bank confirmations and the company's own registries (xlsx); every registry row was matched; copies of one invoice and different number formats are merged; one invoice = one row; exact to the grosz).`);
+  L.push(`Tables:
+- public.fin_invoices(key, seller_code, seller, seller_nip, buyer, number, kind [faktura|zaliczkowa|rozliczeniowa|korekta], issue_date, due_date, net, vat, gross [as printed on the document], value_net, value_gross [amount counted ONCE — use for every total], advance_used, advance_left [advance invoices: part not yet settled], paid, open, paid_date, pay_status [zapłacona|częściowo|niezapłacona|rozliczona zaliczką|skorygowana|brak danych], pay_source [document/registry the status comes from], pay_asof [date of that source], counted [false = draft/replaced invoice, exclude], in_registry, order_no [GW/NN/MM/YYYY], subject, project, stage, doc_titles text[] [files; doc_titles[1] = name to cite], issues text[] [problems found for this invoice])
+- public.fin_receivables(seller_code, seller, number, kind, issue_date, due_date, gross, paid, open, pay_status, pay_source, pay_asof, days_overdue, order_no, subject, dokument) — open items only
+- public.fin_orders(order_no, subject, order_date, sellers, order_value_net [wartość zamówienia netto from the company's order lists], invoiced_net, invoiced_gross [invoiced once, advances moved by noty attributed to the target order], remaining_net [left to invoice], invoices, open, status_unknown, advance_left, moved_in, moved_out, first_invoice, last_invoice, issues) — plan vs execution per order (zamówienie); use it for "budżet / realizacja zamówień / ile zostało do zafakturowania"
+- public.fin_checks(level [error|warn|info], code, msg) — discrepancies found by the engine; public.fin_allocations(number, date, amount, from_order, to_order, title) — noty księgowe (moving an advance to another order — NOT sales)`);
+  L.push(`Rules:
+- Totals of invoicing (sprzedaż / zafakturowano / obroty): sum(value_net), sum(value_gross) FROM fin_invoices WHERE counted — with NO filter on kind (advance invoices are part of the total; settlement duplicates are already 0) and NO filter on documents.category (one ledger for the whole workspace). Yearly totals must equal the "per year" line below. Group companies by seller_code. Months: date_trunc('month', issue_date).
+- Why value_* differs from gross: an advance invoice (zaliczkowa) is the prepayment; a settlement invoice (rozliczeniowa, "Faktura VAT do faktury zaliczkowej", "Faktura rozliczeniowa do zaliczki") re-invoices the SAME money → value 0; lines "Rozliczenie transzy do zaliczki" are already deducted inside an invoice; korekta carries its (negative) difference; noty only move money. Explain this briefly when the user asks why numbers differ from a spreadsheet.
+- Receivables (należności): SELECT … FROM fin_receivables. ALWAYS state the source and date ("stan na <pay_asof> wg <pay_source>"). Report separately: (a) open according to the newest source of each invoice — if that source is older than 30 days, say "ostatnie dane z <date>" instead of calling it confirmed (label such KPIs "Otwarte wg ostatnich danych"), (b) status unknown (pay_status = 'brak danych' — the newest list of receivables no longer shows them, but no payment confirmation) — never add (b) to (a); (c) advances not yet settled (advance_left) are not debts.
+- A specific invoice / order / advance: query fin_invoices / fin_orders, cite doc_titles[1], and show its "issues" if any.
+- If fin_checks has errors related to the question (e.g. the same advance settled twice), say so in **Uwaga**.
+- Never round money in tables; in text use "1 234 567,89 zł".`);
+  L.push(`Current totals (copy exactly, period ${s.period?.[0]} … ${s.period?.[1]}):
+- invoices counted: ${s.invoices} (+${s.not_counted} excluded drafts/replaced); amount counted once: ${zl(s.value_gross)} gross / ${zl(s.value_net)} net; sum of gross as printed on documents ${zl(s.gross_on_documents)} → ${zl(s.duplicates_removed)} is the same money invoiced twice (${(s.duplicates ?? []).join('; ')})
+- per year (canonical, invoiced counted once): ${(s.by_year ?? []).map((y: any) => `${y.year}: ${zl(y.gross)} brutto / ${zl(y.net)} netto, ${y.invoices} faktur (${Object.entries(y.sellers).map(([k, v]) => `${k} ${zl(v as number)}`).join(', ')})`).join(' | ')}
+- per company: ${(s.sellers ?? []).map((x: any) => `${x.code}: ${x.invoices} faktur, ${zl(x.value_gross)} brutto / ${zl(x.value_net)} netto, otwarte potwierdzone ${zl(x.open)} (${x.open_n}), status nieznany ${zl(x.unknown)} (${x.unknown_n})`).join(' | ')}
+- receivables open (newest source per invoice): ${zl(s.open_confirmed)} in ${s.open_count} invoices; by source: ${(s.open_by_source ?? []).map((o: any) => `${zl(o.open)} (${o.invoices} fv, ${o.sellers.join('/')}) wg ${o.source} stan na ${o.asof ?? '?'}`).join('; ')}
+- status unknown: ${zl(s.unknown_gross)} in ${s.unknown_count} invoices; advances not yet settled: ${zl(s.advance_left)}
+- company registries used: ${(s.registries ?? []).map((r: any) => `${r.title} (stan na ${r.asof}, ${r.rows} wierszy)`).join('; ')}
+- engine errors: ${(s.errors ?? []).join(' || ') || 'none'}; warnings: ${s.warnings} (see fin_checks)`);
   return L.join('\n');
 }
 
@@ -172,21 +212,35 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   const user = await requireUser(req);
   if (!user) return json({ error: 'unauthorized' }, 401);
+  const ws = await requireWorkspace(req, user);
+  if (!ws) return json({ error: 'Brak dostępu do tego workspace' }, 403);
 
   const body = await req.json().catch(() => ({}));
   // режим «дашборд вкладки»: задание формируется на сервере, результат сохраняется в public.dashboards
   const dash: string | null = typeof body.dashboard === 'string' && body.dashboard.trim() ? body.dashboard.trim().slice(0, 60) : null;
-  const message: string = dash
+  // правка дашборда: добавить блок по запросу или заменить существующий (index + его описание)
+  const edit: { prompt: string; index: number | null; block: string } | null = dash && body.edit && typeof body.edit.prompt === 'string' && body.edit.prompt.trim()
+    ? { prompt: String(body.edit.prompt).trim().slice(0, 600), index: Number.isInteger(body.edit.index) ? body.edit.index : null, block: String(body.edit.block ?? '').slice(0, 300) }
+    : null;
+  const message: string = edit
+    ? `Dashboard zakładki „${dash}” (dokumenty tej grupy: public.documents WHERE category = '${dash!.replace(/'/g, "''")}'; kwoty — FINANCE LEDGER; sprzedaż — tabela sprzedaży, jeśli jest).
+${edit.index !== null ? `ZMIEŃ istniejący blok (${edit.block}) zgodnie z prośbą użytkownika` : 'DODAJ nowy blok zgodnie z prośbą użytkownika'}: „${edit.prompt}”.
+Zrób potrzebne zapytania SQL / otwórz dokumenty, potem zwróć finalny json, w którym "blocks" zawiera TYLKO nowy blok (najwyżej 2 bloki), dobrany do prośby (wykres, tabela, kpis lub callout), z okresem w tytule. "text": jedno zdanie, co pokazuje blok. Każda liczba z SQL lub z otwartego dokumentu. Jeśli danych brak — zwróć blok callout z wyjaśnieniem, czego brakuje.`
+    : dash
     ? `Zbuduj dashboard zakładki „${dash}” — wyłącznie z danych tej grupy dokumentów (public.documents WHERE category = '${dash.replace(/'/g, "''")}').
 Krok 1: rozpoznaj, co naprawdę jest w tej grupie — SQL: rodzaje dokumentów, zakres dat, kontrahenci, najczęstsze tematy (jsonb_array_elements_text(meta->'topics')), dokumenty z kwotami.
 Krok 2: znajdź i otwórz 3–6 najważniejszych dokumentów tej grupy i wyciągnij z ich TREŚCI dane charakterystyczne właśnie dla niej (np. budżet → pozycje i kwoty, plan vs realizacja; audyt → ustalenia, kwoty sporne, statusy pytań; kampanie → harmonogram, zasięgi, koszty, KPI; umowy → strony, terminy, wartości, kary; zamówienia → numery, etapy, statusy; platforma/IT → moduły, SLA, zgłoszenia; spotkania → decyzje i zadania).
 Krok 3: zwróć 6–9 bloków dobranych do tych danych: kpis z liczbami specyficznymi dla tej grupy, 3–5 wykresów różnych typów (dobierz typ do danych: oś czasu → line/area, struktura → treemap/donut, ranking → bar poziomy, plan vs wykonanie → bar grupowany, etapy → funnel/waterfall), 1–2 tabele z konkretami i callout z tym, co wymaga uwagi.
+Okres: domyślnie bieżący rok (${new Date().getFullYear()}) lub najnowszy okres z danymi; starsze lata (np. ${new Date().getFullYear() - 1}) tylko jako wyraźnie podpisane porównanie. Każdy tytuł z okresem. Budżet: pokaż plan na bieżący rok (dokument budżetu z ${new Date().getFullYear()}), a nie dokumenty z poprzednich lat.
+Firmy: jedna firma = jeden NIP (seller_code z fin_invoices, documents.party_code); warianty nazw nigdy osobno.
+NIGDY nie rób rankingów „dokumentów po kwocie” z documents.net/gross — to przybliżenia AI; kwoty bierz z fin_* albo z treści otwartego dokumentu.
+Jeśli grupa dotyczy pieniędzy (faktury, rozliczenia, zamówienia, budżet, zaliczki) — wszystkie kwoty faktur, płatności, należności i zamówień bierz WYŁĄCZNIE z public.fin_invoices / fin_receivables / fin_orders / fin_checks (value_gross, open, stan na pay_asof), nigdy z documents.gross; budżet (plan) — z treści dokumentu budżetu.
 Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów” — użyj takiego wykresu najwyżej raz i tylko jeśli nic lepszego nie wynika z danych. Każda liczba musi pochodzić z SQL albo z otwartego dokumentu; w tabelach kolumna „dokument”.
 „text”: 2–3 zdania — co zawiera ta zakładka i najważniejszy wniosek.`
     : String(body.message ?? '').trim().slice(0, 4000);
   if (!message) return json({ error: 'empty message' }, 400);
   const lang: string = body.lang === 'en' ? 'en' : 'pl';
-  const db = admin();
+  const db = admin(ws); // все RPC и SQL ИИ — внутри воркспейса
 
   const stream = new TransformStream();
   const writer = stream.writable.getWriter();
@@ -200,24 +254,28 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
       const [{ data: st }, dsRes, { count: locCount }] = await Promise.all([
         db.from('app_settings').select('value').eq('key', 'ai').maybeSingle(),
         body.dataset_id
-          ? db.from('datasets').select('*').eq('id', body.dataset_id).maybeSingle()
-          : db.from('datasets').select('*').eq('is_active', true).maybeSingle(),
-        db.from('locations').select('code', { count: 'exact', head: true }).not('lat', 'is', null),
+          ? db.from('datasets').select('*').eq('id', body.dataset_id).eq('workspace_id', ws).maybeSingle()
+          : db.from('datasets').select('*').eq('is_active', true).eq('workspace_id', ws).maybeSingle(),
+        db.from('locations').select('code', { count: 'exact', head: true }).eq('workspace_id', ws).not('lat', 'is', null),
       ]);
       const s: Settings = { model: 'deepseek-chat', temperature: 0.3, history_turns: 6, rows_to_model: 40, rows_to_client: 500, cache: true, cache_ttl_hours: 24, max_rounds: 3, web: true, ...(st?.value ?? {}) };
       const dataset = dsRes.data;
-      const { data: docStats } = await db.rpc('doc_stats');
-      const { data: others } = await db.from('datasets').select('id, table_name, roles, meta, row_count').eq('status', 'ready').order('created_at');
+      const [{ data: docStats }, fin] = await Promise.all([db.rpc('doc_stats'), ensureFinance(db, ws)]); // реестр пересобирается, если документы изменились
+      const [{ data: parties }, { data: others }, { data: wsRow }] = await Promise.all([
+        db.from('fin_parties').select('nip, code, name, role').eq('workspace_id', ws),
+        db.from('datasets').select('id, table_name, roles, meta, row_count').eq('status', 'ready').eq('workspace_id', ws).order('created_at'),
+        db.from('workspaces').select('name').eq('id', ws).maybeSingle(),
+      ]);
 
       // чат
       let chatId: string = body.chat_id;
       if (!chatId) {
         const { data: chat, error } = await db.from('chats')
-          .insert({ title: message.slice(0, 60), created_by: user.id, dataset_id: dataset?.id ?? null }).select('id').single();
+          .insert({ title: message.slice(0, 60), created_by: user.id, dataset_id: dataset?.id ?? null, workspace_id: ws }).select('id').single();
         if (error) throw error;
         chatId = chat.id;
       } else {
-        const { data: own } = await db.from('chats').select('id').eq('id', chatId).eq('created_by', user.id).maybeSingle();
+        const { data: own } = await db.from('chats').select('id').eq('id', chatId).eq('created_by', user.id).eq('workspace_id', ws).maybeSingle();
         if (!own) throw new Error('chat not found');
       }
       await send('chat', { chat_id: chatId });
@@ -231,7 +289,7 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
       }));
 
       // кэш одинаковых вопросов (только без контекста беседы)
-      const cacheKey = await sha256([dataset?.id, dataset?.version, lang, message.toLowerCase().replace(/\s+/g, ' ')].join('|'));
+      const cacheKey = await sha256([ws, dataset?.id, dataset?.version, fin?.built_at, lang, message.toLowerCase().replace(/\s+/g, ' ')].join('|'));
       if (s.cache && !history.length) {
         const { data: hit } = await db.from('ai_cache').select('answer, created_at, hits').eq('hash', cacheKey).maybeSingle();
         if (hit && Date.now() - new Date(hit.created_at).getTime() < s.cache_ttl_hours * 3600e3) {
@@ -247,8 +305,9 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
 
       const msgs: { role: string; content: string }[] = [
         { role: 'system', content: SYSTEM },
+        { role: 'system', content: `WORKSPACE: ${wsRow?.name ?? '?'} — every table and document you see belongs only to this workspace.` },
         { role: 'system', content: `WEB ACCESS: ${s.web ? 'on' : 'off (do not request "web"; say that internet access is disabled in settings if it is needed)'}. Today: ${new Date().toISOString().slice(0, 10)}.` },
-        { role: 'system', content: `DATA CONTEXT\n${docsCard(docStats)}\n\n${dataset ? datasetCard(dataset, locCount ?? 0, others ?? []).replace(/^DATA CONTEXT\n/, 'SALES TABLE\n') : `SALES TABLE: none loaded. Lookup table public.locations(code, name, city, street, postal, region, branch, kind, email, lat, lng) — ${locCount ?? 0} shops.`}` },
+        { role: 'system', content: `DATA CONTEXT\n${financeCard(fin, parties ?? [])}\n\n${docsCard(docStats)}\n\n${dataset ? datasetCard(dataset, locCount ?? 0, others ?? []).replace(/^DATA CONTEXT\n/, 'SALES TABLE\n') : `SALES TABLE: none loaded. Lookup table public.locations(code, name, city, street, postal, region, branch, kind, email, lat, lng) — ${locCount ?? 0} shops.`}` },
         ...history,
         { role: 'user', content: `${message}\n\n(lang=${lang})` },
       ];
@@ -363,9 +422,30 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
         dataset_id: dataset?.id ?? null,
       };
       const u = { prompt_tokens: usage.prompt, cache_hit_tokens: usage.hit, completion_tokens: usage.completion };
+      if (edit) {
+        // новые id результатов, чтобы не столкнуться с уже сохранёнными (q1, q2…)
+        const tag = Date.now().toString(36);
+        const newResults: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(content.results)) newResults[`${k}_${tag}`] = v;
+        const newBlocks = content.blocks.map((b: any) => (b.q ? { ...b, q: `${b.q}_${tag}` } : b));
+        const { data: cur } = await db.from('dashboards').select('content, doc_count').eq('workspace_id', ws).eq('category', dash).maybeSingle();
+        const base = cur?.content ?? { text: '', blocks: [], results: {} };
+        const blocks = [...(base.blocks ?? [])];
+        if (newBlocks.length) { if (edit.index !== null && edit.index >= 0 && edit.index < blocks.length) blocks.splice(edit.index, 1, ...newBlocks); else blocks.push(...newBlocks); }
+        // результаты, на которые больше никто не ссылается, удаляем
+        const results = { ...(base.results ?? {}), ...newResults } as Record<string, unknown>;
+        const used = new Set(blocks.map((b: any) => b.q).filter(Boolean));
+        for (const k of Object.keys(results)) if (!used.has(k)) delete results[k];
+        const merged = { ...base, blocks, results };
+        if (newBlocks.length) await db.from('dashboards').upsert({ workspace_id: ws, category: dash, content: merged, doc_count: cur?.doc_count ?? 0, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id,category' });
+        await db.from('chats').delete().eq('id', chatId);
+        await db.from('ai_usage').insert({ user_id: user.id, model: s.model, ...u });
+        await send('final', { ...merged, edited: true, added: newBlocks.length, note: content.text, usage: u });
+        return;
+      }
       if (dash) {
-        const { count: n } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('category', dash);
-        if (content.blocks.length) await db.from('dashboards').upsert({ category: dash, content, doc_count: n ?? 0, updated_at: new Date().toISOString() });
+        const { count: n } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('category', dash).eq('workspace_id', ws);
+        if (content.blocks.length) await db.from('dashboards').upsert({ workspace_id: ws, category: dash, content, doc_count: n ?? 0, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id,category' });
         await db.from('chats').delete().eq('id', chatId);
         await db.from('ai_usage').insert({ user_id: user.id, model: s.model, ...u });
         await send('final', { ...content, usage: u, doc_count: n ?? 0 });

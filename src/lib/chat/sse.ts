@@ -1,4 +1,4 @@
-import { supabase, SUPABASE_URL } from '../supabase';
+import { supabase, SUPABASE_URL, wsHeaders } from '../supabase';
 
 export type AiEvent =
   | { event: 'status'; data: { step: string; round?: number } }
@@ -13,11 +13,11 @@ export type AiEvent =
   | { event: 'error'; data: { message: string } };
 
 /** POST в edge function «ai» с чтением SSE-потока шагов. */
-export async function askAI(body: { message: string; chat_id?: string; dataset_id?: string; lang: string; dashboard?: string }, on: (e: AiEvent) => void, signal?: AbortSignal) {
+export async function askAI(body: { message: string; chat_id?: string; dataset_id?: string; lang: string; dashboard?: string; edit?: { prompt: string; index?: number | null; block?: string } }, on: (e: AiEvent) => void, signal?: AbortSignal) {
   const { data } = await supabase.auth.getSession();
   const res = await fetch(`${SUPABASE_URL}/functions/v1/ai`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${data.session?.access_token}`, apikey: import.meta.env.VITE_SUPABASE_KEY },
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${data.session?.access_token}`, apikey: import.meta.env.VITE_SUPABASE_KEY, ...wsHeaders() },
     body: JSON.stringify(body),
     signal,
   });

@@ -12,7 +12,7 @@ export function setLang(l: Lang) {
 const PL = {
   'app.tagline': 'Inteligentna analityka sprzedaży',
   'login.title': 'Zaloguj się',
-  'login.subtitle': 'Panel analityczny dla dyrekcji CK Complex',
+  'login.subtitle': 'Panel analityczny: dokumenty, finanse i sprzedaż',
   'login.user': 'Login',
   'login.pass': 'Hasło',
   'login.submit': 'Wejdź',
@@ -213,7 +213,7 @@ export type Key = keyof typeof PL;
 const EN: Record<Key, string> = {
   'app.tagline': 'Intelligent sales analytics',
   'login.title': 'Sign in',
-  'login.subtitle': 'Analytics workspace for CK Complex directors',
+  'login.subtitle': 'Analytics: documents, finance and sales',
   'login.user': 'Login',
   'login.pass': 'Password',
   'login.submit': 'Enter',

@@ -44,6 +44,7 @@ export async function analyzeAll(onProgress?: (left: number) => void) {
   } finally {
     docs.analyzing = false; docs.progress = '';
     await loadDocStats();
+    void fn('docs', { action: 'finance' }).catch(() => null); // финансовый реестр пересобирается из новых документов
   }
 }
 

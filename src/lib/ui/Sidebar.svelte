@@ -1,7 +1,7 @@
 <script lang="ts">
   import { slide, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { active, app, loadChats, logout, toast } from '../stores/app.svelte';
+  import { active, app, currentWs, loadChats, logout, switchWorkspace, toast } from '../stores/app.svelte';
   import { docs, catHref } from '../docs/store.svelte';
   import { tr } from '../i18n.svelte';
   import { route, href, go } from '../router.svelte';
@@ -51,6 +51,7 @@
   const catIcon = (c: string) => CAT_ICONS.find(([re]) => re.test(c))?.[1] ?? 'report';
   const tabsOn = $derived(route.path.startsWith('/docs/c/'));
   let tabsOpen = $state(true);
+  let wsOpen = $state(false); // меню воркспейсов под логотипом
 
   const isOn = (p: string) => (p === '/' ? route.path === '/' : route.path === p || route.path.startsWith(p + '/'));
   const groupOn = (it: Item) => isOn(it.path) || !!it.children?.some((c) => isOn(c.path));
@@ -88,7 +89,9 @@
   const user = $derived(app.session?.user?.user_metadata?.username ?? app.session?.user?.email?.split('@')[0] ?? '');
 </script>
 
-<svelte:window onresize={() => (wide = window.innerWidth >= 1024)} />
+<svelte:window onresize={() => (wide = window.innerWidth >= 1024)}
+  onclick={(e) => { if (wsOpen && !(e.target as HTMLElement).closest('[data-ws-menu]')) wsOpen = false; }}
+  onkeydown={(e) => { if (e.key === 'Escape') wsOpen = false; }} />
 
 {#if app.sidebarOpen}
   <button class="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden" aria-label="close" transition:fade={{ duration: 200 }} onclick={() => (app.sidebarOpen = false)}></button>
@@ -96,15 +99,36 @@
 
 <aside class="no-print fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-white/[0.06] bg-[#0c0c0d] transition-transform duration-500 lg:static lg:translate-x-0"
   class:-translate-x-full={!app.sidebarOpen} class:collapsed={app.sidebarCollapsed} inert={app.sidebarCollapsed && wide} style="transition-timing-function: var(--ease-out-expo)">
-  <div class="flex h-[68px] items-center justify-between px-5">
-    <a href={href('/')} class="text-white"><Logo size={26} /></a>
+  <div class="relative flex h-[68px] items-center justify-between px-5" data-ws-menu>
+    <div class="text-white"><Logo size={26} subSnippet={wsSwitch} /></div>
+    {#if wsOpen}
+      <div class="absolute top-[60px] left-4 z-50 w-[240px] rounded-2xl border border-white/10 bg-[#141416] p-1.5 shadow-2xl" role="menu" transition:slide={{ duration: 200 }}>
+        <div class="px-3 pt-2 pb-1.5 text-[12px] faint">{tr('Workspace', 'Workspace')}</div>
+        {#each app.workspaces as w (w.id)}
+          <button class="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-[14.5px] transition hover:bg-white/[0.06]" role="menuitem" onclick={() => { wsOpen = false; switchWorkspace(w.id); }}>
+            <span class="min-w-0 flex-1 truncate" class:font-semibold={w.id === app.ws}>{w.name}</span>
+            {#if w.id === app.ws}<Icon name="check" size={15} />{/if}
+          </button>
+        {/each}
+        {#if app.isAdmin}
+          <a class="mt-1 flex items-center gap-2 rounded-xl border-t border-white/[0.06] px-3 py-2.5 text-[14px] muted transition hover:bg-white/[0.06]" href={href('/settings')} onclick={() => (wsOpen = false)}><Icon name="settings" size={15} />{tr('Zarządzaj workspace’ami', 'Manage workspaces')}</a>
+        {/if}
+      </div>
+    {/if}
   </div>
+  {#snippet wsSwitch()}
+    <button class="brand mt-1.5 flex items-center gap-1.5 text-[8.5px] whitespace-nowrap opacity-70 transition hover:opacity-100" style="letter-spacing:.55em" aria-haspopup="menu" aria-expanded={wsOpen} title={tr('Zmień workspace', 'Switch workspace')} onclick={() => (wsOpen = !wsOpen)}>
+      {currentWs()?.name ?? '—'}<span class="transition-transform duration-300" style="letter-spacing:0" class:rotate-180={wsOpen}><Icon name="chevron" size={11} /></span>
+    </button>
+  {/snippet}
 
   <nav class="flex-1 overflow-y-auto px-3 pb-4">
     <a href={href('/chat')} class="nav-item" class:active={route.path.startsWith('/chat')}><Icon name="ask" size={17} /><span>{t('nav.chat')}</span></a>
 
+    {#if docs.stats?.total || !active()}
     <a href={href('/')} class="nav-item" class:active={route.path === '/' || route.path === '/docs'}><Icon name="grid" size={17} /><span>{tr('Przegląd', 'Overview')}</span>
 </a>
+    {/if}
     {#if docTabs.length}
       <button class="nav-item w-full" class:active={tabsOn && !tabsOpen} aria-expanded={tabsOpen} onclick={() => (tabsOpen = !tabsOpen)}>
         <Icon name="layers" size={17} /><span class="truncate">{tr('Zakładki', 'Tabs')}</span>
@@ -180,7 +204,7 @@
     <div class="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-white/5 text-[14px] font-medium uppercase">{user.slice(0, 1)}</div>
     <div class="min-w-0 flex-1">
       <div class="truncate text-[14px] font-bold">{user}</div>
-      <div class="text-[12.5px] faint">CK Complex</div>
+      <div class="truncate text-[12.5px] faint">{currentWs()?.name ?? ''}{app.isAdmin ? ' · admin' : ''}</div>
     </div>
     <button class="icon-btn !h-8 !w-8" title={t('nav.logout')} onclick={logout}><Icon name="logout" size={15} /></button>
   </div>

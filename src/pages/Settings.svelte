@@ -1,6 +1,6 @@
 <script lang="ts">
   import { supabase, fn } from '../lib/supabase';
-  import { app, toast } from '../lib/stores/app.svelte';
+  import { app, loadWorkspaces, switchWorkspace, toast } from '../lib/stores/app.svelte';
   import { i18n, setLang, t, tr } from '../lib/i18n.svelte';
   import { dateTime, int, pct } from '../lib/format';
   import PageHeader from '../lib/ui/PageHeader.svelte';
@@ -16,6 +16,25 @@
   let users = $state<any[]>([]);
   let nu = $state({ username: '', password: '', display_name: '' });
   let pwFor = $state<string | null>(null);
+  // воркспейсы и доступ (только админ)
+  let wsList = $state<{ id: string; name: string; members: string[] }[]>([]);
+  let newWs = $state('');
+  let nuWs = $state<string[]>([]);
+  let renaming = $state<string | null>(null);
+  let renameTo = $state('');
+  let busy = $state('');
+  async function loadWs() { if (app.isAdmin) try { wsList = await fn('users', { action: 'ws_list' }); } catch (e) { toast(String(e), 'err'); } }
+  async function wsAct(body: Record<string, unknown>, key: string, after?: () => void) {
+    busy = key;
+    try { await fn('users', body); after?.(); await Promise.all([loadWs(), refresh(), loadWorkspaces()]); }
+    catch (e) { toast(e instanceof Error ? e.message : String(e), 'err'); }
+    busy = '';
+  }
+  const toggleAccess = (w: string, u: string, grant: boolean) => wsAct({ action: 'ws_access', workspace_id: w, user_id: u, grant }, `${w}:${u}`);
+  async function delWs(w: { id: string; name: string }) {
+    if (!confirm(tr(`Usunąć workspace „${w.name}” razem z jego dokumentami, danymi, czatami i dashboardami? Tego nie da się cofnąć.`, `Delete workspace “${w.name}” with all its documents, data, chats and dashboards? This cannot be undone.`))) return;
+    await wsAct({ action: 'ws_delete', id: w.id }, w.id, () => { if (w.id === app.ws) switchWorkspace(app.workspaces.find((x) => x.id !== w.id)!.id); });
+  }
   let pw = $state('');
 
   async function refresh() {
@@ -26,9 +45,9 @@
     ai = st?.find((x) => x.key === 'ai')?.value ?? null;
     const p = st?.find((x) => x.key === 'pricing')?.value; if (p) pricing = p;
     usage = u ?? [];
-    try { users = await fn('users', { action: 'list' }); } catch (e) { toast(String(e), 'err'); }
+    if (app.isAdmin) try { users = await fn('users', { action: 'list' }); } catch (e) { toast(String(e), 'err'); }
   }
-  $effect(() => { void refresh(); });
+  $effect(() => { void app.isAdmin; void refresh(); void loadWs(); });
 
   async function saveAi() {
     const [{ error }, { error: e2 }] = await Promise.all([
@@ -42,7 +61,7 @@
     toast(`${t('set.clearCache')}: ${data ?? 0}`);
   }
   async function addUser() {
-    try { await fn('users', { action: 'create', ...nu }); nu = { username: '', password: '', display_name: '' }; toast('OK'); await refresh(); }
+    try { await fn('users', { action: 'create', ...nu, workspaces: nuWs }); nu = { username: '', password: '', display_name: '' }; nuWs = []; toast('OK'); await Promise.all([refresh(), loadWs()]); }
     catch (e) { toast(e instanceof Error ? e.message : String(e), 'err'); }
   }
   async function delUser(u: any) {
@@ -125,8 +144,54 @@
   </Panel>
 </div>
 
+{#if app.isAdmin}
+<div class="mt-4">
+  <Panel title={tr('Workspace’y i dostęp', 'Workspaces and access')} sub={tr('Każdy workspace ma własne dokumenty, dane, czaty i dashboardy. Zaznacz, kto ma dostęp; administrator widzi wszystkie.', 'Each workspace has its own documents, data, chats and dashboards. Tick who has access; an administrator sees all.')} icon="layers" group="ai" i={2}>
+    <div class="overflow-x-auto">
+      <table class="w-full min-w-[560px] text-[14.5px]">
+        <thead><tr class="text-left text-[13px] faint">
+          <th class="py-2 pr-3 font-medium">{tr('Workspace', 'Workspace')}</th>
+          {#each users as u (u.id)}<th class="px-2 py-2 text-center font-medium">{u.display_name ?? u.username}{#if u.is_admin}<span class="block text-[11.5px]">admin</span>{/if}</th>{/each}
+          <th></th>
+        </tr></thead>
+        <tbody>
+          {#each wsList as w (w.id)}
+            <tr class="border-t border-white/[0.06]">
+              <td class="py-2.5 pr-3">
+                {#if renaming === w.id}
+                  <form class="flex gap-2" onsubmit={(e) => { e.preventDefault(); void wsAct({ action: 'ws_rename', id: w.id, name: renameTo }, w.id, () => (renaming = null)); }}>
+                    <input class="input !h-9 !w-44" bind:value={renameTo} /><button class="pill pill-sm pill-accent">{t('common.save')}</button>
+                  </form>
+                {:else}
+                  <span class="font-semibold">{w.name}</span>{#if w.id === app.ws}<span class="badge ml-2">{tr('otwarty', 'open')}</span>{/if}
+                {/if}
+              </td>
+              {#each users as u (u.id)}
+                <td class="px-2 py-2.5 text-center">
+                  {#if u.is_admin}<span class="faint" title={tr('Administrator ma dostęp do wszystkich', 'Administrators can access all')}>✓</span>
+                  {:else}<input type="checkbox" class="h-[18px] w-[18px] cursor-pointer accent-[#ff6a3d]" aria-label="{w.name} — {u.username}" checked={w.members.includes(u.id)} disabled={busy === `${w.id}:${u.id}`} onchange={(e) => toggleAccess(w.id, u.id, e.currentTarget.checked)} />{/if}
+                </td>
+              {/each}
+              <td class="py-2.5 text-right whitespace-nowrap">
+                <button class="pill pill-sm" title={tr('Zmień nazwę', 'Rename')} onclick={() => { renaming = w.id; renameTo = w.name; }}><Icon name="pen" size={13} /></button>
+                {#if wsList.length > 1}<button class="pill pill-sm" data-group="alerts" title={tr('Usuń workspace', 'Delete workspace')} disabled={busy === w.id} onclick={() => delWs(w)}><Icon name="trash" size={13} /></button>{/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    <form class="mt-4 flex flex-wrap gap-2 border-t border-white/[0.06] pt-4" onsubmit={(e) => { e.preventDefault(); void wsAct({ action: 'ws_create', name: newWs }, 'new', () => (newWs = '')); }}>
+      <input class="input max-w-xs" placeholder={tr('Nazwa nowego workspace', 'New workspace name')} bind:value={newWs} />
+      <button class="pill pill-accent !h-[42px]" disabled={!newWs.trim() || busy === 'new'}><Icon name="plus" size={15} />{tr('Utwórz workspace', 'Create workspace')}</button>
+    </form>
+  </Panel>
+</div>
+{/if}
+
 <div class="mt-4 grid gap-4 xl:grid-cols-3">
-  <Panel class="xl:col-span-2" title={t('set.users')} sub={tr('Konta bez ról — każdy widzi wszystkie dane', 'Accounts without roles — everyone sees all data')} icon="users" group="managers" i={3}>
+  {#if app.isAdmin}
+  <Panel class="xl:col-span-2" title={t('set.users')} sub={tr('Konta i uprawnienia administratora. Dostęp do workspace’ów — w tabeli wyżej.', 'Accounts and administrator rights. Workspace access — in the table above.')} icon="users" group="managers" i={3}>
     <div class="space-y-2">
       {#each users as u, i (u.id)}
         <div class="flex flex-wrap items-center gap-3 rounded-2xl bg-white/[0.025] px-4 py-3 rise" style="--i:{i}">
@@ -141,6 +206,7 @@
           {:else}
             <button class="pill pill-sm" onclick={() => { pwFor = u.id; pw = ''; }}><Icon name="key" size={13} />{tr('Hasło', 'Password')}</button>
           {/if}
+          {#if !u.me}<button class="pill pill-sm" title={tr('Administrator: tworzy workspace’y i nadaje dostęp', 'Administrator: creates workspaces and grants access')} onclick={() => wsAct({ action: 'set_admin', id: u.id, value: !u.is_admin }, `adm:${u.id}`)}><Icon name="key" size={13} />{u.is_admin ? tr('Odbierz admina', 'Revoke admin') : tr('Nadaj admina', 'Make admin')}</button>{/if}
           {#if !u.me}<button class="pill pill-sm" data-group="alerts" onclick={() => delUser(u)}><Icon name="trash" size={13} /></button>{/if}
         </div>
       {/each}
@@ -151,7 +217,16 @@
       <input class="input" type="password" placeholder={t('login.pass')} bind:value={nu.password} autocomplete="new-password" />
       <button class="pill pill-accent !h-[42px]" onclick={addUser} disabled={!nu.username || nu.password.length < 8}><Icon name="plus" size={15} />{t('set.addUser')}</button>
     </div>
+    {#if wsList.length}
+      <div class="mt-3 flex flex-wrap items-center gap-3 text-[14px]">
+        <span class="faint">{tr('Dostęp nowego konta:', 'New account access:')}</span>
+        {#each wsList as w (w.id)}
+          <label class="flex cursor-pointer items-center gap-2"><input type="checkbox" class="h-4 w-4 accent-[#ff6a3d]" checked={nuWs.includes(w.id)} onchange={(e) => (nuWs = e.currentTarget.checked ? [...nuWs, w.id] : nuWs.filter((x) => x !== w.id))} />{w.name}</label>
+        {/each}
+      </div>
+    {/if}
   </Panel>
+  {/if}
 
   <Panel title={t('set.lang')} icon="globe" group="ai" i={4}>
     <div class="grid grid-cols-2 gap-2">

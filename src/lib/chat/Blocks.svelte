@@ -13,8 +13,10 @@
   import { csvDownload } from '../data/api';
   import { href } from '../router.svelte';
 
-  let { blocks = [], results = {}, baseDelay = 0, compact = false, limit = Infinity }:
-    { blocks: any[]; results: Record<string, { columns: string[]; rows: Record<string, any>[] }>; baseDelay?: number; compact?: boolean; limit?: number } = $props();
+  import type { Snippet } from 'svelte';
+  // tools — панель правки блока (дашборды вкладок): (индекс, блок) → кнопки
+  let { blocks = [], results = {}, baseDelay = 0, compact = false, limit = Infinity, tools }:
+    { blocks: any[]; results: Record<string, { columns: string[]; rows: Record<string, any>[] }>; baseDelay?: number; compact?: boolean; limit?: number; tools?: Snippet<[number, any]> } = $props();
 
   const KINDS = new Set<string>(['bar', 'line', 'area', 'waterfall', 'pie', 'donut', 'rose', 'funnel', 'treemap', 'sunburst', 'scatter', 'bubble', 'heatmap', 'radar', 'gauge', 'sankey', 'graph', 'bar3d', 'scatter3d', 'surface3d', 'network3d', 'map']);
 
@@ -69,7 +71,8 @@
   {#each list.slice(0, limit) as b, i}
     {@const res = b.q ? results[b.q] : Array.isArray(b.data) && b.data.length ? { columns: Object.keys(b.data[0]), rows: b.data as Record<string, any>[] } : null}
     {@const wide = compact || b.type === 'kpis' || b.type === 'text' || b.type === 'callout' || b.type === 'table' || ['bar3d', 'scatter3d', 'surface3d', 'network3d', 'map', 'treemap', 'sankey', 'graph', 'heatmap'].includes(b.chart) || list.filter((x) => x.type === 'chart').length === 1}
-    <div class="rise min-w-0 {wide ? 'md:col-span-2' : ''}" style="--i:{i}; animation-delay:{limit === Infinity ? baseDelay + i * 220 : 0}ms" data-group={b.group ?? 'ai'}>
+    <div class="rise relative min-w-0 {wide ? 'md:col-span-2' : ''} {tools ? 'block-edit' : ''}" style="--i:{i}; animation-delay:{limit === Infinity ? baseDelay + i * 220 : 0}ms" data-group={b.group ?? 'ai'}>
+      {#if tools}<div class="block-tools">{@render tools(i, blocks[i])}</div>{/if}
       {#if b.type === 'kpis'}
         <div class="grid grid-cols-2 gap-3 {b.items?.length > 3 ? 'lg:grid-cols-4' : 'lg:grid-cols-3'}">
           {#each b.items ?? [] as k, j}
@@ -127,3 +130,11 @@
     </div>
   {/each}
 </div>
+
+<style>
+  .block-tools { position: absolute; top: -12px; left: 18px; z-index: 5; display: flex; gap: 4px; padding: 3px; border-radius: 999px;
+    background: #17171a; border: 1px solid rgb(255 255 255 / 0.1); box-shadow: 0 6px 24px rgb(0 0 0 / 0.45);
+    opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .2s; }
+  .block-edit:hover .block-tools, .block-edit:focus-within .block-tools { opacity: 1; transform: none; }
+  @media (hover: none) { .block-tools { opacity: 1; transform: none; } }
+</style>

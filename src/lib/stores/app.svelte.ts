@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { supabase } from '../supabase';
+import { fn, getWorkspace, setWorkspace, supabase } from '../supabase';
 import type { Column, Role } from '../data/infer';
 import { loadDocStats } from '../docs/store.svelte';
 
@@ -22,8 +22,13 @@ export interface Dataset {
 export interface Chat { id: string; title: string; updated_at: string; created_at: string }
 export interface Location { code: string; label: string | null; city: string | null; street: string | null; region: string | null; lat: number | null; lng: number | null; status: string; note: string | null; postal: string | null; name: string | null; branch: string | null; kind: string | null; email: string | null; store_id: string | null; source: string }
 
+export interface Workspace { id: string; name: string }
+
 export const app = $state({
   session: null as Session | null,
+  workspaces: [] as Workspace[],
+  ws: null as string | null,
+  isAdmin: false,
   ready: false,
   datasets: [] as Dataset[],
   chats: [] as Chat[],
@@ -67,7 +72,28 @@ export async function boot() {
   app.ready = true;
 }
 
+/** Воркспейсы пользователя; текущий — сохранённый, иначе первый доступный. */
+export async function loadWorkspaces() {
+  try {
+    const r = await fn<{ admin: boolean; workspaces: Workspace[] }>('users', { action: 'my_workspaces' });
+    app.workspaces = r.workspaces; app.isAdmin = r.admin;
+  } catch { app.workspaces = []; app.isAdmin = false; }
+  const saved = getWorkspace();
+  const id = app.workspaces.find((w) => w.id === saved)?.id ?? app.workspaces[0]?.id ?? null;
+  setWorkspace(id); app.ws = id;
+}
+export const currentWs = () => app.workspaces.find((w) => w.id === app.ws) ?? null;
+
+/** Переключение: сохраняем и перезагружаем приложение — ни одно состояние прежнего воркспейса не остаётся в памяти. */
+export function switchWorkspace(id: string) {
+  if (id === app.ws) return;
+  setWorkspace(id);
+  location.hash = '#/';
+  location.reload();
+}
+
 export async function loadAll() {
+  await loadWorkspaces();
   await Promise.all([loadDatasets(), loadChats(), loadLocations(), loadDocStats()]);
 }
 

@@ -10,8 +10,9 @@ if (!TOKEN) { console.error('SUPABASE_ACCESS_TOKEN is required'); process.exit(1
 const root = new URL('../supabase/functions/', import.meta.url).pathname;
 // общий модуль распознавания данных — один источник правды для браузера и сервера
 copyFileSync(new URL('../src/lib/data/infer.ts', import.meta.url).pathname, join(root, '_shared/infer.ts'));
+copyFileSync(new URL('../src/lib/finance/engine.ts', import.meta.url).pathname, join(root, '_shared/finance.ts'));
 
-const shared = ['_shared/util.ts', '_shared/infer.ts', '_shared/web.ts'];
+const shared = ['_shared/util.ts', '_shared/infer.ts', '_shared/web.ts', '_shared/finance.ts', '_shared/finbuild.ts'];
 const names = process.argv.slice(2).length ? process.argv.slice(2) : ['ai', 'users', 'geo', 'connect', 'docs'];
 
 for (const name of names) {

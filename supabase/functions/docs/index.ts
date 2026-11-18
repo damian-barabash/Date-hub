@@ -1,20 +1,21 @@
 // Разбор документов ИИ: вкладки меню (таксономия, максимум 15) и поля каждого документа
 // (тип, дата, контрагент, номер, суммы, краткое содержание). Модель видит только начало и конец текста.
-import { admin, cors, deepseek, json, parseJson, requireUser } from '../_shared/util.ts';
+import { admin, cors, deepseek, json, parseJson, requireUser, requireWorkspace } from '../_shared/util.ts';
+import { rebuildFinance } from '../_shared/finbuild.ts';
 
 const MAX_CATEGORIES = 20; // вкладки документов; общий лимит меню — 30 пунктов
 type Cat = { name: string; desc: string };
 
-async function getTaxonomy(db: ReturnType<typeof admin>): Promise<Cat[]> {
-  const { data } = await db.from('app_settings').select('value').eq('key', 'taxonomy').maybeSingle();
+async function getTaxonomy(db: ReturnType<typeof admin>, ws: string): Promise<Cat[]> {
+  const { data } = await db.from('app_settings').select('value').eq('key', `taxonomy:${ws}`).maybeSingle();
   return (data?.value?.categories ?? []) as Cat[];
 }
-const saveTaxonomy = (db: ReturnType<typeof admin>, categories: Cat[]) =>
-  db.from('app_settings').upsert({ key: 'taxonomy', value: { categories }, updated_at: new Date().toISOString() });
+const saveTaxonomy = (db: ReturnType<typeof admin>, ws: string, categories: Cat[]) =>
+  db.from('app_settings').upsert({ key: `taxonomy:${ws}`, value: { categories }, updated_at: new Date().toISOString() });
 
 /** Вкладки меню из структуры загруженного: папки + названия файлов → 4–12 понятных разделов. */
-async function buildTaxonomy(db: ReturnType<typeof admin>) {
-  const { data: docs } = await db.from('documents').select('title, path').limit(3000);
+async function buildTaxonomy(db: ReturnType<typeof admin>, ws: string) {
+  const { data: docs } = await db.from('documents').select('title, path').eq('workspace_id', ws).limit(3000);
   const byPath = new Map<string, string[]>();
   for (const d of docs ?? []) { const k = d.path || '(bez folderu)'; byPath.set(k, [...(byPath.get(k) ?? []), d.title]); }
   const lines = [...byPath.entries()].sort((a, b) => b[1].length - a[1].length).slice(0, 140)
@@ -28,7 +29,7 @@ ${lines.join('\n')}`;
   const r = await deepseek([{ role: 'user', content: prompt }], { json: true, temperature: 0.2, max_tokens: 1500 });
   const cats = (parseJson<{ categories: Cat[] }>(r.content)?.categories ?? []).filter((c) => c?.name).slice(0, MAX_CATEGORIES)
     .map((c) => ({ name: String(c.name).slice(0, 40), desc: String(c.desc ?? '').slice(0, 200) }));
-  if (cats.length) await saveTaxonomy(db, cats);
+  if (cats.length) await saveTaxonomy(db, ws, cats);
   await db.from('ai_usage').insert({ model: 'deepseek-chat', prompt_tokens: r.usage.prompt_tokens, cache_hit_tokens: r.usage.prompt_cache_hit_tokens ?? 0, completion_tokens: r.usage.completion_tokens });
   return cats;
 }
@@ -66,16 +67,19 @@ ${text}`;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
-  if (!(await requireUser(req))) return json({ error: 'unauthorized' }, 401);
-  const db = admin();
+  const user = await requireUser(req);
+  if (!user) return json({ error: 'unauthorized' }, 401);
+  const ws = await requireWorkspace(req, user);
+  if (!ws) return json({ error: 'Brak dostępu do tego workspace' }, 403);
+  const db = admin(ws);
   const body = await req.json().catch(() => ({}));
   try {
-    if (body.action === 'taxonomy') return json({ categories: await buildTaxonomy(db) });
+    if (body.action === 'taxonomy') return json({ categories: await buildTaxonomy(db, ws) });
     if (body.action === 'analyze') {
-      let cats = await getTaxonomy(db);
-      if (!cats.length || body.rebuild) cats = await buildTaxonomy(db);
+      let cats = await getTaxonomy(db, ws);
+      if (!cats.length || body.rebuild) cats = await buildTaxonomy(db, ws);
       if (!cats.length) cats = [{ name: 'Dokumenty', desc: 'Wszystkie dokumenty' }];
-      const q = db.from('documents').select('id').eq('status', 'new').order('created_at').limit(Math.min(Number(body.limit) || 8, 12));
+      const q = db.from('documents').select('id').eq('workspace_id', ws).eq('status', 'new').order('created_at').limit(Math.min(Number(body.limit) || 8, 12));
       const { data: todo } = await q;
       const usage = { p: 0, h: 0, c: 0 }; let failed = 0;
       await Promise.all((todo ?? []).map(async (d) => {
@@ -83,12 +87,13 @@ Deno.serve(async (req) => {
         catch { failed++; await db.from('documents').update({ status: 'error' }).eq('id', d.id); }
       }));
       if (todo?.length) await db.from('ai_usage').insert({ model: 'deepseek-chat', prompt_tokens: usage.p, cache_hit_tokens: usage.h, completion_tokens: usage.c });
-      const { count } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('status', 'new');
+      const { count } = await db.from('documents').select('id', { count: 'exact', head: true }).eq('workspace_id', ws).eq('status', 'new');
       return json({ done: (todo?.length ?? 0) - failed, failed, remaining: count ?? 0 });
     }
+    if (body.action === 'finance') return json(await rebuildFinance(db, ws)); // финансовый реестр из документов (без ИИ)
     if (body.action === 'reset') { // перераспределить всё заново (после смены набора документов)
-      await db.from('documents').update({ status: 'new' }).neq('status', 'new');
-      return json({ categories: await buildTaxonomy(db) });
+      await db.from('documents').update({ status: 'new' }).eq('workspace_id', ws).neq('status', 'new');
+      return json({ categories: await buildTaxonomy(db, ws) });
     }
     return json({ error: 'unknown action' }, 400);
   } catch (e) {

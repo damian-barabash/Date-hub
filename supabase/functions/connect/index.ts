@@ -3,7 +3,7 @@
 // action: test (предпросмотр) | sync (загрузка) | cron (плановая синхронизация, x-cron-secret)
 // на сервере — npm-сборка SheetJS (бандлер Supabase не тянет cdn.sheetjs.com)
 import * as XLSX from 'npm:xlsx@0.18.5';
-import { admin, cors, json, requireUser } from '../_shared/util.ts';
+import { admin, cors, json, requireUser, requireWorkspace } from '../_shared/util.ts';
 import { chunks, inferTable, pickArray } from '../_shared/infer.ts';
 
 type Rows = Record<string, unknown>[];
@@ -56,9 +56,12 @@ async function fetchRows(kind: string, config: any, secret: any): Promise<Rows> 
   }
 }
 
-async function sync(db: ReturnType<typeof admin>, connectorId: string) {
-  const { data: c, error } = await db.from('connectors').select('*').eq('id', connectorId).single();
+async function sync(db0: ReturnType<typeof admin>, connectorId: string, ws?: string) {
+  let q0 = db0.from('connectors').select('*').eq('id', connectorId);
+  if (ws) q0 = q0.eq('workspace_id', ws);
+  const { data: c, error } = await q0.single();
   if (error) throw error;
+  const db = admin(c.workspace_id); // наборы данных создаются в воркспейсе коннектора
   const { data: sec } = await db.from('connector_secrets').select('secret').eq('connector_id', connectorId).maybeSingle();
   try {
     const raw = await fetchRows(c.kind, c.config, sec?.secret);
@@ -117,7 +120,10 @@ Deno.serve(async (req) => {
     return json({ synced: out });
   }
 
-  if (!(await requireUser(req))) return json({ error: 'unauthorized' }, 401);
+  const user = await requireUser(req);
+  if (!user) return json({ error: 'unauthorized' }, 401);
+  const ws = await requireWorkspace(req, user);
+  if (!ws) return json({ error: 'Brak dostępu do tego workspace' }, 403);
   try {
     if (body.action === 'test') {
       const raw = await fetchRows(body.kind, body.config ?? {}, body.secret ?? {});
@@ -130,7 +136,7 @@ Deno.serve(async (req) => {
         name: String(body.name ?? 'Źródło'), kind: String(body.kind), config: body.config ?? {},
         schedule_minutes: body.schedule_minutes ? Number(body.schedule_minutes) : null, mode: body.mode === 'append' ? 'append' : 'replace',
       };
-      const q = body.id ? db.from('connectors').update(row).eq('id', body.id).select('id').single() : db.from('connectors').insert(row).select('id').single();
+      const q = body.id ? db.from('connectors').update(row).eq('id', body.id).eq('workspace_id', ws).select('id').single() : db.from('connectors').insert({ ...row, workspace_id: ws }).select('id').single();
       const { data, error } = await q;
       if (error) throw error;
       if (body.secret && Object.keys(body.secret).length) {
@@ -139,12 +145,13 @@ Deno.serve(async (req) => {
       return json({ id: data.id });
     }
     if (body.action === 'delete') {
-      const { data: c } = await db.from('connectors').select('dataset_id').eq('id', body.id).maybeSingle();
-      if (c?.dataset_id && body.with_data) await db.rpc('ds_drop', { p_id: c.dataset_id });
-      await db.from('connectors').delete().eq('id', body.id);
+      const { data: c } = await db.from('connectors').select('dataset_id').eq('id', body.id).eq('workspace_id', ws).maybeSingle();
+      if (!c) return json({ error: 'not found' }, 404);
+      if (c.dataset_id && body.with_data) await admin(ws).rpc('ds_drop', { p_id: c.dataset_id });
+      await db.from('connectors').delete().eq('id', body.id).eq('workspace_id', ws);
       return json({ ok: true });
     }
-    if (body.action === 'sync') return json(await sync(db, String(body.id)));
+    if (body.action === 'sync') return json(await sync(db, String(body.id), ws));
     return json({ error: 'unknown action' }, 400);
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 400);

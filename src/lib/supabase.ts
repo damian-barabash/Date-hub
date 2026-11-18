@@ -1,8 +1,26 @@
 import { createClient } from '@supabase/supabase-js';
 
 export const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+
+// Текущий воркспейс уходит заголовком x-workspace в КАЖДЫЙ запрос (REST, RPC, edge) — сервер (public.cur_ws) сам фильтрует данные.
+const WS_KEY = 'dh-ws';
+let WS: string | null = (() => { try { return localStorage.getItem(WS_KEY); } catch { return null; } })();
+export const getWorkspace = () => WS;
+export function setWorkspace(id: string | null) {
+  WS = id;
+  try { if (id) localStorage.setItem(WS_KEY, id); else localStorage.removeItem(WS_KEY); } catch { /* приватный режим */ }
+}
+export const wsHeaders = (): Record<string, string> => (WS ? { 'x-workspace': WS } : {});
+
 export const supabase = createClient(SUPABASE_URL, import.meta.env.VITE_SUPABASE_KEY as string, {
   auth: { persistSession: true, autoRefreshToken: true, storageKey: 'datehub-auth' },
+  global: {
+    fetch: (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
+      if (WS && !headers.has('x-workspace')) headers.set('x-workspace', WS);
+      return fetch(input, { ...init, headers });
+    },
+  },
 });
 
 export const LOGIN_DOMAIN = 'datehub.infinitiq.pl';

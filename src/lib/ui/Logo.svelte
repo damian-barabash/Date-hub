@@ -1,7 +1,10 @@
 <script lang="ts">
+  import type { Snippet } from 'svelte';
   import { CUTS, D_SHAPE } from './logo-paths';
-  let { size = 34, text = true, sub = true, color = 'currentColor', gradient = false, animate = false }:
-    { size?: number; text?: boolean; sub?: boolean; color?: string; gradient?: boolean; animate?: boolean } = $props();
+  import { currentWs } from '../stores/app.svelte';
+  // subText — подпись под названием (имя воркспейса); subSnippet — своя подпись (переключатель воркспейса в сайдбаре)
+  let { size = 34, text = true, sub = true, subText = currentWs()?.name ?? '', subSnippet, color = 'currentColor', gradient = false, animate = false }:
+    { size?: number; text?: boolean; sub?: boolean; subText?: string; subSnippet?: Snippet; color?: string; gradient?: boolean; animate?: boolean } = $props();
   const uid = Math.random().toString(36).slice(2, 8);
 </script>
 
@@ -22,7 +25,7 @@
   {#if text}
     <div class="leading-none">
       <div class="brand text-[16px] font-normal whitespace-nowrap" style="letter-spacing:.06em">AI DATA HUB</div>
-      {#if sub}<div class="brand mt-1.5 text-[8.5px] opacity-55 whitespace-nowrap" style="letter-spacing:.55em">CK COMPLEX</div>{/if}
+      {#if subSnippet}{@render subSnippet()}{:else if sub && subText}<div class="brand mt-1.5 text-[8.5px] opacity-55 whitespace-nowrap" style="letter-spacing:.55em">{subText}</div>{/if}
     </div>
   {/if}
 </div>

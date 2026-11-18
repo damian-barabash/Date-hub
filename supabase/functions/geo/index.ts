@@ -2,21 +2,24 @@
 // 1) DeepSeek раскладывает код на город / улицу / объект (одним пакетным запросом, мало токенов);
 // 2) координаты ищет браузер (Nominatim), см. src/lib/data/geocode.ts.
 // Функция разбирает порцию кодов и возвращает остаток неразобранных.
-import { admin, cors, deepseek, json, parseJson, requireUser } from '../_shared/util.ts';
+import { admin, cors, deepseek, json, parseJson, requireUser, requireWorkspace } from '../_shared/util.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
-  if (!(await requireUser(req))) return json({ error: 'unauthorized' }, 401);
-  const db = admin();
+  const user = await requireUser(req);
+  if (!user) return json({ error: 'unauthorized' }, 401);
+  const ws = await requireWorkspace(req, user);
+  if (!ws) return json({ error: 'Brak dostępu do tego workspace' }, 403);
+  const db = admin(ws);
   const body = await req.json().catch(() => ({}));
 
   if (body.action === 'reset') {
-    await db.from('locations').update({ status: 'pending', lat: null, lng: null, city: null, street: null }).neq('status', 'manual');
+    await db.from('locations').update({ status: 'pending', lat: null, lng: null, city: null, street: null }).eq('workspace_id', ws).neq('status', 'manual');
     return json({ ok: true });
   }
 
   // шаг 1: разбор кодов ИИ (для всех ещё не разобранных, одним запросом до 120 кодов)
-  const { data: unparsed } = await db.from('locations').select('code').eq('status', 'pending').is('city', null).limit(45);
+  const { data: unparsed } = await db.from('locations').select('code').eq('workspace_id', ws).eq('status', 'pending').is('city', null).limit(45);
   if (unparsed?.length) {
     const codes = unparsed.map((r) => r.code);
     const prompt = `Polish retail shop codes of a vape-shop chain. Each code = CITY abbreviation + street name (often without Polish diacritics, sometimes with prefixes like "AL" aleja, "PL" plac, "OS" osiedle, "GEN", "BOH", "WOJ" Wojska, "JP2"/"JANAPAWLAII") + house number. Codes starting "ADC-" are kiosks in shopping malls: ADC-<CITY>-<mall or street>.
@@ -30,16 +33,16 @@ Reply json: {"items":[{"code":"…","city":"Gliwice","street":"Dworcowa 47","pla
         if (!it?.code || !codes.includes(it.code)) continue;
         await db.from('locations').update({
           city: it.city ?? null, street: it.street ?? null, label: it.label ?? null, note: it.place ?? null, updated_at: new Date().toISOString(),
-        }).eq('code', it.code);
+        }).eq('workspace_id', ws).eq('code', it.code);
       }
     } catch (e) {
       return json({ error: `AI: ${e instanceof Error ? e.message : e}` }, 500);
     }
-    const { count } = await db.from('locations').select('code', { count: 'exact', head: true }).eq('status', 'pending').is('city', null);
+    const { count } = await db.from('locations').select('code', { count: 'exact', head: true }).eq('workspace_id', ws).eq('status', 'pending').is('city', null);
     return json({ parsed: unparsed.length, remaining: count ?? 0 });
   }
 
   // координаты ищет браузер (src/lib/data/geocode.ts): из облачных IP OSM отвечает медленно и отказывает
-  const { count } = await db.from('locations').select('code', { count: 'exact', head: true }).eq('status', 'pending').is('city', null);
+  const { count } = await db.from('locations').select('code', { count: 'exact', head: true }).eq('workspace_id', ws).eq('status', 'pending').is('city', null);
   return json({ parsed: 0, remaining: count ?? 0 });
 });
