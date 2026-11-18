@@ -174,9 +174,13 @@ function docsCard(stats: any): string {
 const zl = (n: number | null | undefined) => (n === null || n === undefined ? '—' : `${n.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł`);
 
 // Финансовый реестр: структура + готовые итоги (модель их копирует, а детали берёт SQL-запросом)
-function financeCard(fin: any, parties: any[]): string {
-  if (!fin?.summary) return 'FINANCE LEDGER: not built yet (no invoices found in documents).';
-  const s = fin.summary; const L: string[] = [];
+function financeCard(fin: any, parties: any[], facts: any[] = [], docParties: any[] = []): string {
+  const P: string[] = [];
+  if (docParties.length) P.push(`COUNTERPARTIES (kontrahenci — companies in documents after merging name variants by NIP / name; documents.party_code; "jacy kontrahenci / ile firm" = this list, NEVER count distinct documents.counterparty strings — those are raw spellings with people and e-mails): ${docParties.map((d: any) => `${d.code}${parties.find((p) => p.code === d.code) ? ` = ${parties.find((p) => p.code === d.code).name} [${parties.find((p) => p.code === d.code).role === 'buyer' ? 'client' : 'our company'}]` : ''} — ${d.docs} docs`).join('; ')}.`);
+  const rf = facts.find((f: any) => f.key === 'receivables');
+  if (rf) P.push(`COMPANY FIGURE — receivables: the company states the client owes us ${zl(Number(rf.value))} in total (entered ${rf.asof}${rf.note ? `; ${rf.note}` : ''}). This is THE headline answer to "ile nam są winni / należności / ile muszą zapłacić" — state it first as "wg firmy". Then show what the documents confirm (open receivables below), invoices without payment status, and the gap = company figure − confirmed${fin?.summary ? ` = ${zl(Number(rf.value) - Number(fin.summary.open_confirmed))}` : ''}; explain the gap as invoices / registries not uploaded yet (e.g. invoices issued after the newest uploaded ones) or part of the invoices without status. Never replace the company figure with a computed one and never invent which invoices make up the gap.`);
+  if (!fin?.summary) return [...P, 'FINANCE LEDGER: not built yet (no invoices found in documents).'].join('\n');
+  const s = fin.summary; const L: string[] = [...P];
   const sellers = parties.filter((p) => p.role === 'seller'); const buyers = parties.filter((p) => p.role === 'buyer');
   L.push(`COMPANY: our group (sellers, "my / nam / nasze firmy"): ${sellers.map((p) => `${p.code} = ${p.name} (NIP ${p.nip})`).join('; ')}. Client: ${buyers.map((p) => `${p.code} = ${p.name} (NIP ${p.nip})`).join('; ')}. Name variants of one company are merged by NIP (e.g. "MTM CONSULTING", "MARIUSZ MIĘKOŚ MTM CONSULTING" = MTMC). "Ile nam wiszą / należności / zaległości" = what the client still owes our companies.`);
   L.push(`FINANCE LEDGER (built ${String(fin.built_at).slice(0, 16).replace('T', ' ')} by a deterministic engine from the invoice texts, bank confirmations and the company's own registries (xlsx); every registry row was matched; copies of one invoice and different number formats are merged; one invoice = one row; exact to the grosz).`);
@@ -271,6 +275,10 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
         db.from('datasets').select('id, table_name, roles, meta, row_count').eq('status', 'ready').eq('workspace_id', ws).order('created_at'),
         db.from('workspaces').select('name').eq('id', ws).maybeSingle(),
       ]);
+      const [{ data: facts }, { data: docParties }] = await Promise.all([
+        db.from('fin_facts').select('key, value, asof, note').eq('workspace_id', ws),
+        db.rpc('doc_parties'),
+      ]);
 
       // чат
       let chatId: string = body.chat_id;
@@ -294,7 +302,7 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
       }));
 
       // кэш одинаковых вопросов (только без контекста беседы)
-      const cacheKey = await sha256([ws, dataset?.id, dataset?.version, fin?.built_at, lang, message.toLowerCase().replace(/\s+/g, ' ')].join('|'));
+      const cacheKey = await sha256([ws, dataset?.id, dataset?.version, fin?.built_at, JSON.stringify(facts ?? []), lang, message.toLowerCase().replace(/\s+/g, ' ')].join('|'));
       if (s.cache && !history.length) {
         const { data: hit } = await db.from('ai_cache').select('answer, created_at, hits').eq('hash', cacheKey).maybeSingle();
         if (hit && Date.now() - new Date(hit.created_at).getTime() < s.cache_ttl_hours * 3600e3) {
@@ -321,7 +329,7 @@ Zakazane: ogólny szablon „liczba dokumentów w czasie / rodzaje dokumentów�
         { role: 'system', content: SYSTEM },
         { role: 'system', content: `WORKSPACE: ${wsRow?.name ?? '?'} — every table and document you see belongs only to this workspace.${focusNote ? `\n${focusNote}` : ''}` },
         { role: 'system', content: `WEB ACCESS: ${s.web ? 'on' : 'off (do not request "web"; say that internet access is disabled in settings if it is needed)'}. Today: ${new Date().toISOString().slice(0, 10)}.` },
-        { role: 'system', content: `DATA CONTEXT\n${financeCard(fin, parties ?? [])}\n\n${docsCard(docStats)}\n\n${dataset ? datasetCard(dataset, locCount ?? 0, others ?? []).replace(/^DATA CONTEXT\n/, 'SALES TABLE\n') : `SALES TABLE: none loaded. Lookup table public.locations(code, name, city, street, postal, region, branch, kind, email, lat, lng) — ${locCount ?? 0} shops.`}` },
+        { role: 'system', content: `DATA CONTEXT\n${financeCard(fin, parties ?? [], facts ?? [], docParties ?? [])}\n\n${docsCard(docStats)}\n\n${dataset ? datasetCard(dataset, locCount ?? 0, others ?? []).replace(/^DATA CONTEXT\n/, 'SALES TABLE\n') : `SALES TABLE: none loaded. Lookup table public.locations(code, name, city, street, postal, region, branch, kind, email, lat, lng) — ${locCount ?? 0} shops.`}` },
         ...history,
         { role: 'user', content: `${message}\n\n(lang=${lang})` },
       ];

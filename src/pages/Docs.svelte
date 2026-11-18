@@ -17,7 +17,7 @@
   import Blocks from '../lib/chat/Blocks.svelte';
   import Markdown from '../lib/chat/Markdown.svelte';
   import { askAI } from '../lib/chat/sse';
-  import { fin, loadFinance, type FinRow } from '../lib/finance/store.svelte';
+  import { fin, loadFinance, saveFact, type FinRow } from '../lib/finance/store.svelte';
 
   const docId = $derived(route.parts[0] === 'docs' && route.parts[1] && route.parts[1] !== 'c' ? route.parts[1] : null);
   const category = $derived(route.parts[1] === 'c' && route.parts[2] ? decodeURIComponent(route.parts[2]) : null);
@@ -40,7 +40,7 @@
     (async () => {
       const out: Doc[] = [];
       for (let from = 0; from < 20000; from += 1000) {
-        let qy = supabase.from('documents').select('id,title,category,doc_type,summary,doc_date,counterparty,number,net,gross,meta,status').order('doc_date', { ascending: false, nullsFirst: false }).order('id').range(from, from + 999);
+        let qy = supabase.from('documents').select('id,title,category,doc_type,summary,doc_date,counterparty,party_code,number,net,gross,meta,status').order('doc_date', { ascending: false, nullsFirst: false }).order('id').range(from, from + 999);
         if (c) qy = qy.eq('category', c);
         const { data } = await qy;
         out.push(...((data ?? []) as unknown as Doc[]));
@@ -170,6 +170,25 @@
     return [...m.values()].sort((a, b) => a.month.localeCompare(b.month)).map((x) => ({ ...x, label: new Date(x.month + '-01').toLocaleDateString(i18n.lang === 'en' ? 'en-GB' : 'pl-PL', { month: 'short', year: '2-digit' }).replace('.', '') }));
   });
   const byParty = $derived.by(() => { const m = new Map<string, { kontrahent: string; kwota: number; dokumenty: number }>(); for (const r of money) { const k = r.seller_code || party(r.seller); const a = m.get(k) ?? { kontrahent: k, kwota: 0, dokumenty: 0 }; a.kwota += amt(r); a.dokumenty++; m.set(k, a); } return [...m.values()].sort((a, b) => b.kwota - a.kwota).slice(0, 10); });
+  // kontrahenci: firmy scalone po NIP / nazwie (documents.party_code), nie surowe napisy z dokumentów
+  const parties = $derived.by(() => {
+    const m = new Map<string, number>();
+    for (const d of list as (Doc & { party_code?: string | null })[]) if (d.party_code) m.set(d.party_code, (m.get(d.party_code) ?? 0) + 1);
+    return [...m.entries()].map(([code, n]) => {
+      const p = fin.parties.find((x) => x.code === code); const s = fin.summary?.sellers?.find((x) => x.code === code);
+      return { code, n, name: p?.name ?? code, role: p?.role === 'seller' ? tr('nasza firma', 'our company') : p?.role === 'buyer' ? tr('klient', 'client') : '', invoiced: s ? Number((s as any).value_gross ?? 0) : null, open: s ? s.open : p?.role === 'buyer' ? (fin.facts.find((f) => f.key === 'receivables')?.value ?? fin.summary?.open_confirmed ?? null) : null };
+    }).sort((a, b) => b.n - a.n);
+  });
+  const mainParties = $derived(parties.filter((p) => p.n > 1 || p.invoiced !== null));
+  // należności: kwota ustalona przez firmę (jeśli jest) vs to, co potwierdzają dokumenty
+  const recvFact = $derived(category ? null : (fin.facts.find((f) => f.key === 'receivables') ?? null));
+  let factEdit = $state(false); let factVal = $state(''); let factNote = $state('');
+  async function storeFact(clear = false) {
+    const v = clear ? null : Number(factVal.replace(/\s/g, '').replace(',', '.'));
+    if (!clear && !Number.isFinite(v)) return toast(tr('Podaj kwotę', 'Enter an amount'), 'err');
+    try { await saveFact('receivables', v, new Date().toISOString().slice(0, 10), factNote.trim() || null); factEdit = false; toast(tr('Zapisano', 'Saved')); }
+    catch (e: any) { toast(e.message, 'err'); }
+  }
   const byCat = $derived((docs.stats?.cats ?? []).map((c) => ({ kategoria: c.category, dokumenty: c.n })));
   const total = $derived(money.reduce((a, d) => a + amt(d), 0));
   const recent = $derived(list.filter((d) => d.summary && d.doc_date).slice(0, 8));
@@ -187,6 +206,7 @@
   $effect(() => { void fType; page = 0; });
   const th = (by: keyof Doc) => () => (sort = { by, dir: sort.by === by ? (sort.dir === 1 ? -1 : 1) : -1 });
   const arrow = (by: keyof Doc) => (sort.by === by ? (sort.dir === -1 ? ' ↓' : ' ↑') : '');
+  const grosz = (v: number) => `${v.toLocaleString(i18n.lang === 'en' ? 'en-GB' : 'pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł`; // co do grosza
   const fdate = (s: string | null) => (s ? new Date(s).toLocaleDateString(i18n.lang === 'en' ? 'en-GB' : 'pl-PL') : '—');
 </script>
 
@@ -230,8 +250,8 @@
   <div class="kpis">
     <Kpi hero i={0} label={tr('Dokumenty', 'Documents')} value={list.length || null} format="int" compact={false} icon="report" {loading} hint={list.length ? `${fdate(list.reduce((m, d) => (d.doc_date && (!m || d.doc_date < m) ? d.doc_date : m), null as string | null))} – ${fdate(list.reduce((m, d) => (d.doc_date && (!m || d.doc_date > m) ? d.doc_date : m), null as string | null))}` : ''} />
     {#if money.length}<Kpi i={1} label={tr('Zafakturowano (brutto)', 'Invoiced (gross)')} value={total} format="pln" icon="coins" hint="{money.length} {tr('faktur, każda kwota liczona raz', 'invoices, each amount counted once')}{!category && fin.summary?.duplicates_removed ? ` · ${tr('bez dubli', 'w/o duplicates')} ${pln(fin.summary.duplicates_removed, true)}` : ''}" />
-      <Kpi i={2} label={tr('Należności otwarte', 'Open receivables')} value={openSum} format="pln" icon="alert" group="alerts" hint="{newestAsof ? `${tr('dane', 'data')}: ${fdate(newestAsof)}` : ''}{unknownSum ? ` · ${tr('status nieznany', 'status unknown')} ${pln(unknownSum, true)}` : ''}" />{/if}
-    <Kpi i={2} label={tr('Kontrahenci', 'Counterparties')} value={new Set(list.map((d) => d.counterparty).filter(Boolean).map((x) => party(x))).size || null} format="int" compact={false} icon="users" />
+      {#if recvFact}<Kpi i={2} label={tr('Należności otwarte', 'Open receivables')} value={recvFact.value} format="pln" icon="alert" group="alerts" hint="{tr('wg firmy', 'per company')} {fdate(recvFact.asof)} · {tr('w dokumentach', 'in documents')} {pln(openSum, true)}" />
+      {:else}<Kpi i={2} label={tr('Należności otwarte', 'Open receivables')} value={openSum} format="pln" icon="alert" group="alerts" hint="{newestAsof ? `${tr('dane', 'data')}: ${fdate(newestAsof)}` : ''}{unknownSum ? ` · ${tr('status nieznany', 'status unknown')} ${pln(unknownSum, true)}` : ''}" />{/if}{/if}
     <Kpi i={3} label={tr('Rodzaje dokumentów', 'Document types')} value={types.length || null} format="int" compact={false} icon="layers" hint={types.slice(0, 2).map((x) => x.type).join(', ')} />
   </div>
 
@@ -294,6 +314,47 @@
     {:else if buildErr}
       <div class="card card-pad mt-4 flex flex-wrap items-center gap-3 text-[14.5px]" role="alert"><span class="min-w-0 flex-1 text-[#f59a98]">{buildErr}</span><button class="pill pill-sm" onclick={() => buildDash(category!)}><Icon name="refresh" size={13} />{tr('Spróbuj ponownie', 'Try again')}</button></div>
     {/if}
+  {/if}
+  {#if !hits && !category && (mainParties.length || money.length)}
+    <div class="mt-4 grid gap-4 xl:grid-cols-2">
+      {#if mainParties.length}
+        <Panel title={tr('Kontrahenci', 'Counterparties')} sub={tr('warianty nazw jednej firmy scalone po NIP', 'name variants of one company merged by tax ID')} icon="users" group="managers" i={3}>
+          <div class="space-y-1.5">
+            {#each mainParties.slice(0, 12) as p (p.code)}
+              <div class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-3.5 py-2.5">
+                <span class="min-w-0 flex-1"><span class="block truncate text-[14px] font-semibold">{p.name}{#if p.name !== p.code}<span class="faint font-normal"> · {p.code}</span>{/if}</span><span class="block truncate text-[13px] faint">{p.role ? `${p.role} · ` : ''}{int(p.n)} {tr('dok.', 'docs')}{p.invoiced ? ` · ${tr('faktury', 'invoiced')} ${pln(p.invoiced, true)}` : ''}</span></span>
+                {#if p.open}<span class="shrink-0 text-right"><span class="block text-[14.5px] font-semibold num">{grosz(p.open)}</span><span class="block text-[12px] faint">{p.role === tr('klient', 'client') ? tr('winien nam', 'owes us') : tr('otwarte', 'open')}</span></span>{/if}
+              </div>
+            {/each}
+          </div>
+          {#if parties.length > mainParties.length}<p class="mt-3 text-[13px] faint">+ {parties.length - mainParties.length} {tr('firm z pojedynczym dokumentem', 'companies with a single document')}</p>{/if}
+        </Panel>
+      {/if}
+      {#if money.length}
+        <Panel title={tr('Należności od klienta', 'Receivables from the client')} sub={tr('kwota firmy i to, co potwierdzają dokumenty', 'company figure vs what documents confirm')} icon="alert" group="alerts" i={4}>
+          {#snippet actions()}<button class="pill pill-sm" onclick={() => { factEdit = !factEdit; factVal = recvFact ? String(recvFact.value) : ''; factNote = recvFact?.note ?? ''; }}><Icon name="pen" size={13} />{recvFact ? tr('Zmień', 'Change') : tr('Podaj kwotę firmy', 'Enter company figure')}</button>{/snippet}
+          {#if factEdit}
+            <form class="mb-4 flex flex-col gap-2" onsubmit={(e) => { e.preventDefault(); void storeFact(); }}>
+              <input class="input" inputmode="decimal" bind:value={factVal} placeholder={tr('Ile klient jest winien łącznie, np. 2924000', 'Total the client owes, e.g. 2924000')} />
+              <input class="input" bind:value={factNote} placeholder={tr('Skąd ta kwota (opcjonalnie)', 'Where it comes from (optional)')} />
+              <div class="flex flex-wrap gap-2"><button class="pill pill-accent pill-sm">{tr('Zapisz', 'Save')}</button>{#if recvFact}<button type="button" class="pill pill-sm" data-group="alerts" onclick={() => storeFact(true)}>{tr('Usuń kwotę firmy', 'Remove company figure')}</button>{/if}<button type="button" class="pill pill-sm" onclick={() => (factEdit = false)}>{tr('Anuluj', 'Cancel')}</button></div>
+            </form>
+          {/if}
+          {@const rows = [
+            ...(recvFact ? [[tr('Wg firmy', 'Per company') + ` (${fdate(recvFact.asof)})`, recvFact.value, recvFact.note ?? '']] : []),
+            [tr('Potwierdzone w dokumentach', 'Confirmed in documents'), openSum, newestAsof ? `${tr('najnowsze dane', 'newest data')}: ${fdate(newestAsof)}` : ''],
+            [tr('Faktury bez statusu płatności', 'Invoices without payment status'), unknownSum, tr('nie ma ich na najnowszej liście należności, brak potwierdzenia zapłaty', 'not on the newest receivables list, no payment confirmation')],
+            ...(recvFact ? [[tr('Brakuje w dokumentach', 'Missing in documents'), recvFact.value - openSum, recvFact.value - openSum > 0 ? tr('faktury/zestawienia, których nie wgrano, albo część faktur bez statusu', 'invoices/registries not uploaded, or part of the invoices without status') : tr('dokumenty pokazują więcej niż kwota firmy', 'documents show more than the company figure')]] : []),
+          ] as [string, number, string][]}
+          <div class="space-y-1.5">
+            {#each rows as [k, v, h], i (i)}
+              <div class="flex items-center gap-3 rounded-xl bg-white/[0.025] px-3.5 py-2.5"><span class="min-w-0 flex-1"><span class="block text-[14px] font-semibold">{k}</span>{#if h}<span class="block text-[13px] faint">{h}</span>{/if}</span><span class="shrink-0 text-[14.5px] font-semibold num">{grosz(v)}</span></div>
+            {/each}
+          </div>
+          <button class="pill pill-sm mt-3" onclick={() => go(`/chat?q=${encodeURIComponent(tr('Rozpisz należności od CK: kwota firmy, co potwierdzają dokumenty, faktury bez statusu i czego brakuje', 'Break down receivables from CK: company figure, confirmed, without status, missing'))}`)}><Icon name="ask" size={13} />{tr('Rozpisz z AI', 'Break down with AI')}</button>
+        </Panel>
+      {/if}
+    </div>
   {/if}
   {#if !hits && (!category || (dashLoaded && !dash && !building))}
     <div class="mt-4 grid gap-4 xl:grid-cols-2">
